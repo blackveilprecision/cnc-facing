@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Facing — Makera Z1</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #14161a; --panel: #1c1f25; --line: #2e333c; --ink: #e6e8ec;
+    --dim: #949aa6; --accent: #e0a458; --ok: #6fbf73; --bad: #e06c6c;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f4f2ee; --panel: #fff; --line: #ddd8cf; --ink: #22252a;
+            --dim: #6b7280; --accent: #a16207; --ok: #2f7d38; --bad: #b3261e; }
+  }
+  * { box-sizing: border-box; }
+  /* `display: grid/flex` below would otherwise beat the hidden attribute. */
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap;
+    padding: 1rem 1.25rem; border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 1.05rem; margin: 0; letter-spacing: .01em; }
+  header .sub { color: var(--dim); font-size: .85rem; }
+  main {
+    display: grid; grid-template-columns: minmax(300px, 380px) 1fr;
+    gap: 1.25rem; padding: 1.25rem; max-width: 1200px; margin: 0 auto;
+    align-items: start;
+  }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1rem 1.1rem;
+  }
+  .panel + .panel { margin-top: 1rem; }
+  h2 {
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .09em;
+    color: var(--dim); margin: 0 0 .8rem; font-weight: 600;
+  }
+  label { display: block; margin-bottom: .85rem; }
+  label > span { display: block; font-size: .8rem; color: var(--dim); margin-bottom: .25rem; }
+  input[type=number] {
+    width: 100%; padding: .5rem .6rem; font: 1rem/1.2 var(--mono);
+    background: var(--bg); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px;
+  }
+  input:focus-visible, button:focus-visible, .seg label:focus-within {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+  }
+  input.bad { border-color: var(--bad); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+  .seg { display: flex; gap: .4rem; margin-bottom: .85rem; }
+  .seg label { flex: 1; margin: 0; }
+  .seg input { position: absolute; opacity: 0; width: 0; }
+  .seg span {
+    display: block; text-align: center; padding: .45rem .3rem; font-size: .88rem;
+    border: 1px solid var(--line); border-radius: 6px; cursor: pointer;
+  }
+  .seg input:checked + span {
+    border-color: var(--accent); color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  .seg2 { display: grid; grid-template-columns: 1fr 1fr; }
+  .seg span sup { color: var(--bad); font-weight: 700; }
+  .derived { color: var(--bad); }
+  details { margin-top: .25rem; }
+  summary { cursor: pointer; font-size: .8rem; color: var(--dim); }
+  details > div { padding-top: .8rem; }
+  figure { margin: 0; }
+  figure svg { display: block; width: 100%; border-radius: 8px; border: 1px solid var(--line); }
+  figcaption { color: var(--dim); font-size: .78rem; margin-top: .5rem; }
+  dl.spec { display: grid; grid-template-columns: auto 1fr; gap: .3rem .9rem; margin: 0; }
+  dl.spec dt { color: var(--dim); font-size: .85rem; }
+  dl.spec dd { margin: 0; font-family: var(--mono); font-size: .85rem; }
+  dl.spec dd small { font-family: system-ui, sans-serif; color: var(--dim); }
+  .msgs { list-style: none; padding: 0; margin: .5rem 0 0; }
+  .msgs li {
+    font-size: .85rem; padding: .5rem .7rem; border-radius: 6px;
+    border-left: 3px solid var(--dim); background: var(--bg); margin-bottom: .4rem;
+  }
+  .msgs li.warn { border-left-color: var(--accent); }
+  .msgs li.bad { border-left-color: var(--bad); color: var(--bad); }
+  button {
+    width: 100%; padding: .7rem; font: 600 .95rem system-ui, sans-serif;
+    background: var(--accent); color: var(--bg);
+    border: 0; border-radius: 7px; cursor: pointer;
+  }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  pre {
+    font: .78rem/1.5 var(--mono); background: var(--bg); color: var(--dim);
+    padding: .6rem .7rem; border-radius: 6px; overflow-x: auto; margin: .6rem 0 0;
+    border: 1px solid var(--line);
+  }
+  .fname { font-family: var(--mono); font-size: .8rem; color: var(--dim);
+           margin-top: .5rem; word-break: break-all; text-align: center; }
+  .cite { color: var(--dim); font-size: .76rem; margin-top: .7rem; }
+  table.mdi { width: 100%; border-collapse: collapse; }
+  table.mdi td { vertical-align: top; padding: .3rem .5rem .3rem 0; border-top: 1px solid var(--line); }
+  table.mdi tr:first-child td { border-top: 0; }
+  table.mdi td.why { font-size: .78rem; color: var(--dim); }
+  table.mdi tr.crit code { border-color: var(--accent); color: var(--accent); }
+  .onlytool {
+    font: .9rem var(--mono); padding: .45rem .6rem; margin-bottom: .85rem;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--bg);
+  }
+  code.copy {
+    display: inline-block; white-space: nowrap; cursor: copy;
+    font: .82rem/1.3 var(--mono); padding: .25rem .45rem;
+    border: 1px solid var(--line); border-radius: 5px; background: var(--bg);
+  }
+  code.copy:hover { border-color: var(--accent); }
+  code.copy.done { color: var(--ok); border-color: var(--ok); }
+  .copyall {
+    width: auto; padding: .35rem .7rem; font-size: .78rem; font-weight: 500;
+    background: transparent; color: var(--dim); border: 1px solid var(--line);
+  }
+  .copyall:hover { color: var(--ink); border-color: var(--accent); }
+  nav.tabs { display: flex; gap: .3rem; margin-left: auto; }
+  nav.tabs a {
+    color: var(--dim); text-decoration: none; font-size: .88rem;
+    padding: .35rem .8rem; border: 1px solid var(--line); border-radius: 6px;
+  }
+  nav.tabs a[aria-current="page"] {
+    color: var(--accent); border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  .drop {
+    display: block; text-align: center; padding: 2rem 1rem; cursor: pointer;
+    border: 2px dashed var(--line); border-radius: 10px; color: var(--dim);
+  }
+  .drop.over, .drop:hover { border-color: var(--accent); color: var(--ink); }
+  .drop input { display: none; }
+  .drop strong { color: var(--ink); }
+  .verdict { font-weight: 600; padding: .7rem .9rem; border-radius: 8px; border-left: 4px solid var(--dim);
+             background: var(--bg); margin-bottom: .6rem; }
+  .verdict.fail, .verdict.silent { border-left-color: var(--bad); color: var(--bad); }
+  .verdict.warn { border-left-color: var(--accent); color: var(--accent); }
+  .verdict.ok { border-left-color: var(--ok); color: var(--ok); }
+  .msgs li.silent { border-left-color: var(--bad); }
+  .msgs li .lv { font: 600 .68rem system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em;
+                 margin-right: .4rem; }
+  .msgs li.bad .lv, .msgs li.silent .lv { color: var(--bad); }
+  .msgs li.warn .lv { color: var(--accent); }
+  .msgs li .lv.note { color: var(--dim); }
+  .msgs li p { margin: .3rem 0 0; color: var(--ink); }
+  .msgs li .where { font-size: .76rem; color: var(--dim); margin-top: .3rem; }
+  .msgs li code.sample { display: block; margin-top: .3rem; font: .76rem var(--mono); color: var(--dim);
+                         white-space: pre-wrap; word-break: break-all; }
+  .legend { font-size: .76rem; color: var(--dim); margin: .6rem 0 0; }
+  select {
+    width: 100%; padding: .5rem .6rem; font: .9rem system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px;
+  }
+  table.bits { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  table.bits th { text-align: left; font-weight: 600; color: var(--dim); font-size: .72rem;
+                  text-transform: uppercase; letter-spacing: .06em; padding: 0 .6rem .4rem 0; white-space: nowrap; }
+  table.bits td { padding: .4rem .6rem .4rem 0; border-top: 1px solid var(--line); vertical-align: top; }
+  table.bits td.n { font-family: var(--mono); white-space: nowrap; }
+  table.bits td.n small { display: block; color: var(--dim); font-family: system-ui, sans-serif; }
+  table.bits td.over { color: var(--bad); font-weight: 600; }
+  table.bits td.deviation { color: var(--accent); }
+  table.bits td.name small { display: block; color: var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Facing — Makera Z1</h1>
+  <span class="sub" id="ver"></span>
+  <nav class="tabs">
+    <a href="#" id="tab-gen">Generate</a>
+    <a href="#check" id="tab-chk">Check a file</a>
+  </nav>
+</header>
+
+<main id="gen">
+  <form id="f" autocomplete="off">
+    <div class="panel">
+      <h2>The job</h2>
+      <div class="row">
+        <label><span>Size X (mm)</span><input type="number" name="width" value="80" min="0" step="0.1" required></label>
+        <label><span>Size Y (mm)</span><input type="number" name="height" value="60" min="0" step="0.1" required></label>
+      </div>
+      <span style="display:block;font-size:.8rem;color:var(--dim);margin-bottom:.25rem">Job</span>
+      <div class="seg" id="modes">
+        <label><input type="radio" name="mode" value="general" checked><span>General</span></label>
+        <label><input type="radio" name="mode" value="finish"><span>Fine finish</span></label>
+      </div>
+      <p class="cite" id="modenote" style="margin-top:-.4rem"></p>
+      <div id="patternrow">
+        <span style="display:block;font-size:.8rem;color:var(--dim);margin-bottom:.25rem">Pattern</span>
+        <div class="seg seg2" id="patterns"></div>
+        <p class="cite" id="patternnote" style="margin-top:-.4rem"></p>
+      </div>
+      <label><span>Depth (mm)</span><input type="number" name="depth" value="0.3" min="0" step="0.05" required></label>
+      <span style="display:block;font-size:.8rem;color:var(--dim);margin-bottom:.25rem">Material</span>
+      <div class="seg" id="mats"></div>
+      <span id="toollabel" style="display:block;font-size:.8rem;color:var(--dim);margin-bottom:.25rem">Bit in the collet</span>
+      <div class="seg" id="tools"></div>
+      <div id="onlytool" class="onlytool" hidden></div>
+      <p class="cite" id="toolnote" style="margin-top:-.4rem"></p>
+      <details>
+        <summary>Advanced</summary>
+        <div>
+          <label><span>Stepover (fraction of tool diameter)</span>
+            <input type="number" name="stepover" value="0.45" min="0.05" max="1" step="0.05" required></label>
+          <p class="cite">0.45 is what every faced board on this machine was cut with — conservative
+          for MDF's ragged fibres. Changing it is a machining decision, not a preference.</p>
+        </div>
+      </details>
+    </div>
+
+    <div class="panel">
+      <h2>Download</h2>
+      <button type="submit" id="dl">Generate .nc</button>
+      <div class="fname" id="fname"></div>
+      <pre id="scp" hidden></pre>
+    </div>
+  </form>
+
+  <div>
+    <div class="panel">
+      <h2>Preview</h2>
+      <figure>
+        <div id="svg"></div>
+        <figcaption id="cap"></figcaption>
+      </figure>
+    </div>
+
+    <div class="panel">
+      <h2>Derived</h2>
+      <dl class="spec" id="spec"></dl>
+      <p class="cite" id="cite"></p>
+    </div>
+
+    <div class="panel" id="notes-panel">
+      <h2>Before you start</h2>
+      <ul class="msgs" id="notes"></ul>
+    </div>
+
+    <div class="panel" id="reach-panel">
+      <h2>Reach check — paste into MDI</h2>
+      <p class="cite" style="margin-top:0">
+        Walks the four corners of the stock, which is what the laser boundary trace
+        will follow. Jogging there is 10&nbsp;mm a press with a wait between; these are
+        one move each. Click a line to copy it.
+      </p>
+      <table class="mdi"><tbody id="mdi"></tbody></table>
+      <button type="button" class="copyall" id="copyall">Copy all seven lines</button>
+    </div>
+  </div>
+</main>
+
+<main id="chk" hidden>
+  <div>
+    <div class="panel">
+      <h2>Check a .nc</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept=".nc,.cnc,.gcode,.ngc,.tap,.txt">
+        <strong>Drop a G-code file here</strong><br>or click to choose one.
+      </label>
+      <p class="cite">Checked against what has been learned on this machine: the <code>;@MKR|</code>
+      header, tool changes, feeds, depth against flute length, travel, vacuum, the program end.
+      The file is read and reported on, and never stored.</p>
+    </div>
+
+    <div class="panel" id="c-stats-panel" hidden>
+      <h2>The file</h2>
+      <label><span>Check the bits against Makera's figures for</span>
+        <select id="c-material"></select></label>
+      <dl class="spec" id="c-stats"></dl>
+    </div>
+  </div>
+
+  <div id="c-out" hidden>
+    <div class="panel">
+      <h2>Verdict</h2>
+      <div class="verdict" id="c-verdict"></div>
+      <ul class="msgs" id="c-findings"></ul>
+      <p class="legend"><b>Fail</b>: aborts, damages a bit or the work, or breaks a limit this app enforces.
+      <b>Silent</b>: runs, but the preview, boundary trace or extraction quietly does not happen.
+      <b>Warning</b>: differs from what is known to work. <b>Note</b>: worth knowing, including what is still untested.</p>
+    </div>
+
+    <div class="panel" id="c-bits-panel">
+      <h2>Bits against Makera's table</h2>
+      <div style="overflow-x:auto"><table class="bits" id="c-bits"></table></div>
+      <p class="cite" id="c-bits-note"></p>
+    </div>
+
+    <div class="panel">
+      <h2>Toolpath</h2>
+      <figure>
+        <div id="c-svg"></div>
+        <figcaption>Seen from above. Solid: cutting below Z0. Dashed grey: moves in the air.
+        Dashed red: material removed, tool radius included. Shaded: the declared stock.
+        The crosshair is X0 Y0.</figcaption>
+      </figure>
+    </div>
+
+    <div class="panel" id="c-reach-panel">
+      <h2>Reach check — paste into MDI</h2>
+      <p class="cite" style="margin-top:0" id="c-reach-note"></p>
+      <table class="mdi"><tbody id="c-mdi"></tbody></table>
+      <button type="button" class="copyall" id="c-copyall">Copy all seven lines</button>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const form = $("f");
+
+const meta = await (await fetch("/api/materials")).json();
+$("ver").textContent = `v${meta.version} · ${meta.envelope.x} × ${meta.envelope.y} mm envelope`;
+const MATS = Object.fromEntries(meta.materials.map((m) => [m.id, m]));
+$("mats").innerHTML = meta.materials.map((m, i) =>
+  `<label><input type="radio" name="material" value="${m.id}"${i ? "" : " checked"}><span>${m.label}</span></label>`
+).join("");
+
+const SHORT = {
+  "serpentine-x": "Serpentine X", "serpentine-y": "Serpentine Y",
+  "oneway-y": "One-way Y", spiral: "Spiral",
+};
+$("patterns").innerHTML = meta.patterns.map((p) =>
+  `<label title="${p.label}"><input type="radio" name="pattern" value="${p.id}"` +
+  `${p.id === meta.defaultPattern ? " checked" : ""}><span>${SHORT[p.id] ?? p.label}</span></label>`
+).join("");
+
+/** The bit list depends on the material, so it is rebuilt whenever that changes. */
+function renderTools(keep) {
+  const tools = MATS[form.material.value].tools;
+  const chosen = tools.some((t) => t.id === keep) ? keep : tools[0].id;
+  $("tools").innerHTML = tools.map((t) =>
+    `<label><input type="radio" name="tool" value="${t.id}"${t.id === chosen ? " checked" : ""}>` +
+    `<span>${t.label}${t.derived ? "<sup>*</sup>" : ""}</span></label>`).join("");
+  // With one bit there is nothing to choose, so the radio stays in the DOM to
+  // carry its value and the row collapses to a plain statement of what to fit.
+  const only = tools.length === 1;
+  $("tools").hidden = only;
+  $("toollabel").textContent = only ? "Bit to fit" : "Bit in the collet";
+  $("onlytool").hidden = !only;
+  $("onlytool").textContent = only ? tools[0].tool : "";
+}
+
+const MODE_NOTE = {
+  general: "One pass of the chosen pattern per depth level. For a spoilboard or fixture plate you tape stock to — flat matters, shiny does not.",
+  finish: "Roughs to within an allowance, then takes it off in one pass at 90° with about half the stepover. For soft metals where the surface is the point.",
+};
+
+const PATTERN_NOTE = {
+  "serpentine-x": "The original: cuts along X, alternating climb and conventional.",
+  "serpentine-y": "Cuts along Y, the stiffer axis, still alternating climb and conventional.",
+  "oneway-y": "Cuts along Y, front to back, climb on every pass; lifts and returns between passes.",
+  spiral: "Clockwise rings inward, climb throughout. One coupon shows the X-cut and Y-cut surfaces side by side.",
+};
+
+function syncMode() {
+  $("modenote").textContent = MODE_NOTE[form.mode.value];
+  // Fine finish is a fixed strategy (rough along X, finish along Y), so the
+  // pattern only applies to general mode.
+  $("patternrow").hidden = form.mode.value === "finish";
+  $("patternnote").textContent = PATTERN_NOTE[form.pattern.value];
+}
+
+function currentTool() {
+  return MATS[form.material.value].tools.find((t) => t.id === form.tool.value);
+}
+
+/**
+ * The stepover follows the bit. The 6mm rows deliberately use a smaller
+ * FRACTION so the absolute step — and so any ridge left by spindle tram —
+ * stays where the 3.175 puts it. Carrying 0.45 across would step 2.7mm.
+ */
+function syncStepover() {
+  const t = currentTool();
+  if (!t) return;
+  form.stepover.value = t.stepover;
+  $("toolnote").innerHTML = t.derived
+    ? `<span class="derived">Derived feeds</span> — Makera sells this bit but publishes no speeds and feeds for it. Start shallow.`
+    : "Makera's published figures for this bit and material.";
+}
+
+renderTools();
+syncStepover();
+syncMode();
+
+function body() {
+  const b = Object.fromEntries(new FormData(form));
+  if (b.mode === "finish") delete b.pattern;
+  return b;
+}
+
+function duration(min) {
+  if (min < 1) return `${Math.round(min * 60)} s`;
+  if (min < 60) return `${min.toFixed(1)} min`;
+  return `${Math.floor(min / 60)} h ${String(Math.round(min % 60)).padStart(2, "0")} m`;
+}
+
+function renderOk(d) {
+  const s = d.summary;
+  $("svg").innerHTML = d.svg;
+  $("cap").textContent =
+    `Swept X 0 → ${s.sweptArea.x[1]}, Y ${s.sweptArea.y[0]} → 0. ` +
+    `The crosshair is X0 Y0; Y runs toward you. ` +
+    (s.finish ? "Shown: the finishing pass, which is the surface you get."
+              : "Shown: one depth level; the rest repeat it. The dot is where the tool goes down.");
+  $("spec").innerHTML = [
+    ["Pattern", s.finish ? "Serpentine X, then a finishing pass along Y" : s.patternLabel],
+    ["Tool", s.tool + (s.derived ? ' <span class="derived">derived feeds</span>' : "")],
+    ["Spindle", `${s.rpm} rpm`],
+    ["Feed / plunge", `${s.feed} / ${s.plunge} mm/min`],
+    ["Stepover", `${s.stepoverMm.toFixed(3)} mm <small>(${s.stepoverPct}% of ${s.tool.split("*")[0]}mm)</small>`],
+    ["Depth per pass", `≤ ${s.maxDepthPerPass} mm`],
+    ["Passes", s.finish
+      ? `${s.levels - 1} × ${s.passesPerLevel} roughing + ${s.finish.passes} finishing = ${s.totalPasses}`
+      : `${s.levels} × ${s.passesPerLevel} ${s.passUnit} = ${s.totalPasses}`],
+    ["Pass depths", s.passDepths.map((v) => v.toFixed(3)).join(", ") + " mm"],
+    ...(s.finish ? [["Finishing pass",
+      `${s.finish.allowance} mm at ${s.finish.stepoverMm.toFixed(2)} mm step` +
+      (s.finish.rotated ? ", rotated 90°" : "")]] : []),
+    ["Cutting length", `${Math.round(s.cutLengthMm)} mm`],
+    ["Estimated time", `<strong>${duration(s.minutes)}</strong>`],
+    ["Declared stock", `${s.stock.length} × ${s.stock.width} × ${s.stock.height} mm`],
+  ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  $("cite").innerHTML = `Source: ${s.source}.<br>${s.materialNote}`;
+  $("notes").innerHTML = s.warnings
+    .map((w) => `<li class="${w.level === "warn" ? "warn" : ""}">${w.text}</li>`).join("");
+  $("mdi").innerHTML = d.reach.map((s) =>
+    `<tr class="${s.critical ? "crit" : ""}">` +
+    `<td><code class="copy" tabindex="0">${s.code}</code></td>` +
+    `<td class="why">${s.why}</td></tr>`).join("");
+  $("copyall").dataset.all = d.reach.map((s) => s.code).join("\n");
+  $("fname").textContent = d.filename;
+  $("scp").hidden = d.scp.length === 0;
+  $("scp").textContent = d.scp.join("\n");
+  $("dl").disabled = false;
+  for (const el of form.elements) el.classList?.remove("bad");
+}
+
+function renderRefused(refusals) {
+  $("svg").innerHTML = "";
+  $("cap").textContent = "";
+  $("spec").innerHTML = "";
+  $("cite").textContent = "";
+  $("fname").textContent = "";
+  $("scp").hidden = true;
+  $("dl").disabled = true;
+  $("mdi").innerHTML = "";
+  $("notes").innerHTML = refusals.map((r) => `<li class="bad">${r.text ?? r.message}</li>`).join("");
+  for (const el of form.elements) el.classList?.remove("bad");
+  for (const r of refusals) form.elements[r.field]?.classList?.add("bad");
+}
+
+async function copied(el, text) {
+  try { await navigator.clipboard.writeText(text); } catch { return; }
+  const was = el.textContent;
+  el.classList.add("done");
+  if (el.tagName === "BUTTON") el.textContent = "Copied";
+  setTimeout(() => { el.classList.remove("done"); el.textContent = was; }, 1200);
+}
+$("mdi").addEventListener("click", (e) => {
+  const el = e.target.closest("code.copy");
+  if (el) copied(el, el.textContent);
+});
+$("copyall").addEventListener("click", (e) => copied(e.currentTarget, e.currentTarget.dataset.all));
+
+let pending;
+async function plan() {
+  clearTimeout(pending);
+  pending = setTimeout(async () => {
+    const res = await fetch("/api/plan", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body()),
+    });
+    const d = await res.json();
+    d.ok ? renderOk(d) : renderRefused(d.refusals);
+  }, 120);
+}
+
+form.addEventListener("input", (e) => {
+  if (e.target.name === "material") { renderTools(form.tool?.value); syncStepover(); }
+  else if (e.target.name === "tool") syncStepover();
+  else if (e.target.name === "mode" || e.target.name === "pattern") syncMode();
+  plan();
+});
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("dl").disabled = true;
+  const res = await fetch("/api/download", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body()),
+  });
+  if (!res.ok) { renderRefused((await res.json()).refusals); return; }
+  const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition"))[1];
+  const url = URL.createObjectURL(await res.blob());
+  Object.assign(document.createElement("a"), { href: url, download: name }).click();
+  URL.revokeObjectURL(url);
+  $("dl").disabled = false;
+});
+
+plan();
+// ------------------------------------------------------------------ check tab
+
+/** File content ends up in these strings, so every one of them is escaped. */
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+function showTab() {
+  const chk = location.hash === "#check";
+  $("gen").hidden = chk;
+  $("chk").hidden = !chk;
+  $(chk ? "tab-chk" : "tab-gen").setAttribute("aria-current", "page");
+  $(chk ? "tab-gen" : "tab-chk").removeAttribute("aria-current");
+}
+addEventListener("hashchange", showTab);
+showTab();
+
+const VERDICT = {
+  fail: "Will not run as intended — see the failures below.",
+  silent: "Will run, but something will quietly not happen.",
+  warn: "Should run. Read the warnings first.",
+  ok: "Matches everything known to work on the Z1.",
+};
+const LEVEL = { fail: "Fail", silent: "Silent", warn: "Warning", note: "Note" };
+const LI_CLASS = { fail: "bad", silent: "silent", warn: "warn", note: "" };
+
+const mm = (v) => (v === null || v === undefined ? "–" : `${Number(v.toFixed(2))}`);
+const span = (b) => b ? `X ${mm(b.x0)} → ${mm(b.x1)}, Y ${mm(b.y0)} → ${mm(b.y1)} <small>(${mm(b.x1 - b.x0)} × ${mm(b.y1 - b.y0)} mm)</small>` : "–";
+
+function renderBits(d) {
+  const m = d.material;
+  $("c-bits-panel").hidden = d.bits.length === 0;
+  const cell = (b, field, unit = "") => {
+    const used = field === "rpm" ? (b.used.rpm.length ? b.used.rpm.join(", ") : null) : b.used[field];
+    const pub = b.published ? b.published[field] : null;
+    const cls = b.over[field] ?? "";
+    return `<td class="n ${cls}">${used === null || used === undefined ? "–" : esc(used) + unit}` +
+      (b.published ? `<small>Makera ${pub}${unit}</small>` : "") + `</td>`;
+  };
+  $("c-bits").innerHTML =
+    `<tr><th>Tool</th><th>Bit</th><th>rpm</th><th>Feed</th><th>Plunge</th><th>Depth / pass</th></tr>` +
+    d.bits.map((b) => `<tr><td class="n">T${b.tool}</td>` +
+      `<td class="name">${b.bit ? esc(b.bit) : `<span class="derived">not identified</span>`}` +
+      `<small>${esc(b.name)}</small>` +
+      (b.published === null ? `<small class="derived">Makera publishes nothing for ${esc(m.label)}</small>` : "") + `</td>` +
+      cell(b, "rpm") + cell(b, "feed") + cell(b, "plunge") + cell(b, "doc", " mm") + `</tr>`).join("");
+  $("c-bits-note").textContent = m.id
+    ? `Against Makera's ${m.label} column${m.from === "header" ? ", read from the file's header" : ""}. ` +
+      "Makera's figures are ceilings: \"start the test from the lower limit\". Depth per pass is measured on a simulated stock: " +
+      "a helix counts its pitch, moves through cleared air count nothing, a pass skimming a thin wall is not a deep one; for a drill it is the peck. " +
+      "Feed and plunge count only moves that are in material."
+    : "Pick the material above to check each bit against Makera's figures.";
+}
+
+let lastFile = null;
+
+function renderCheck(d) {
+  const s = d.stats;
+  const h = s.header;
+  const sel = $("c-material");
+  const chosen = d.material.from === "chosen" ? d.material.id : "";
+  const fromHeader = d.material.from === "header" ? ` (${d.material.label})` : d.material.from === null && !chosen ? " (not recognised)" : "";
+  sel.innerHTML = `<option value="">From the file's header${esc(fromHeader)}</option>` +
+    d.materials.map((m) => `<option value="${m.id}"${m.id === chosen ? " selected" : ""}>${esc(m.label)}</option>`).join("");
+  renderBits(d);
+  $("c-stats-panel").hidden = false;
+  $("c-out").hidden = false;
+  $("c-stats").innerHTML = [
+    ["File", esc(d.filename)],
+    ["Size", `${s.lines.toLocaleString()} lines, ${(s.bytes / 1024).toFixed(0)} KB, ${s.lineEndings.toUpperCase()}`],
+    ["Made by", esc(h.cam ?? "unknown — no ;@MKR| header")],
+    ["Stock", h.stock ? `${h.stock.length} × ${h.stock.width} × ${h.stock.height} mm` : "not declared"],
+    ["Tools", h.tools.length ? h.tools.map((t) => `T${t.number} ${esc(t.name)}`).join("<br>") : "none declared"],
+    ["Tool changes", s.toolChanges.length ? s.toolChanges.map((t) => `T${t}`).join(" → ") : "none"],
+    ["Spindle", s.rpms.length ? s.rpms.map((r) => `${r}`).join(", ") + " rpm" : "–"],
+    ["Fastest feed", s.maxFeed === null ? "–" : `${mm(s.maxFeed)} mm/min`],
+    ["Tool centres", span(s.extents)],
+    ["Material removed", span(s.cutExtents)],
+    ["Z range", `${mm(s.zMin)} → ${mm(s.zMax)} mm`],
+    ["Estimated time", `<strong>${duration(s.seconds / 60)}</strong>` +
+      (h.time ? ` <small>(header says ${duration(h.time / 60)})</small>` : "")],
+    ["Thumbnail", s.thumbnail.present ? `${s.thumbnail.width} × ${s.thumbnail.height} PNG` : "none"],
+  ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+
+  $("c-verdict").className = `verdict ${d.verdict}`;
+  $("c-verdict").textContent = VERDICT[d.verdict];
+  $("c-findings").innerHTML = d.findings.map((f) => {
+    const where = f.lines.length
+      ? `Line${f.lines.length > 1 ? "s" : ""} ${f.lines.join(", ")}${f.count > f.lines.length ? ` … ${f.count.toLocaleString()} in all` : ""}`
+      : "";
+    return `<li class="${LI_CLASS[f.level]}"><span class="lv ${f.level}">${LEVEL[f.level]}</span>` +
+      `<strong>${esc(f.title)}</strong><p>${esc(f.detail)}</p>` +
+      (f.sample ? `<code class="sample">${esc(f.sample)}</code>` : "") +
+      ((where || f.source) ? `<div class="where">${[where, f.source && `From ${esc(f.source)}`].filter(Boolean).join(" · ")}</div>` : "") +
+      `</li>`;
+  }).join("");
+
+  $("c-svg").innerHTML = d.svg;
+  $("c-reach-panel").hidden = d.reach.length === 0;
+  $("c-reach-note").textContent = h.stock
+    ? "Walks the declared stock's corners, which is what the laser boundary trace should follow. Click a line to copy it."
+    : "No stock declared, so this walks the material the file removes, tool radius included. Click a line to copy it.";
+  $("c-mdi").innerHTML = d.reach.map((r) =>
+    `<tr class="${r.critical ? "crit" : ""}"><td><code class="copy" tabindex="0">${esc(r.code)}</code></td>` +
+    `<td class="why">${esc(r.why)}</td></tr>`).join("");
+  $("c-copyall").dataset.all = d.reach.map((r) => r.code).join("\n");
+}
+
+async function checkFile(file, material = "") {
+  lastFile = file;
+  $("c-verdict").className = "verdict";
+  $("c-verdict").textContent = `Reading ${file.name}…`;
+  $("c-out").hidden = false;
+  $("c-findings").innerHTML = "";
+  const q = `name=${encodeURIComponent(file.name)}` + (material ? `&material=${encodeURIComponent(material)}` : "");
+  const res = await fetch(`/api/check?${q}`, {
+    method: "POST",
+    headers: { "content-type": "text/plain" },
+    body: file,
+  });
+  const d = await res.json();
+  if (!d.ok) {
+    $("c-verdict").className = "verdict fail";
+    $("c-verdict").textContent = d.error ?? "The file could not be checked.";
+    return;
+  }
+  renderCheck(d);
+}
+
+$("file").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) checkFile(f); });
+$("c-material").addEventListener("change", (e) => { if (lastFile) checkFile(lastFile, e.target.value); });
+const drop = $("drop");
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", (e) => {
+  e.preventDefault();
+  drop.classList.remove("over");
+  const f = e.dataTransfer.files[0];
+  if (f) checkFile(f);
+});
+$("c-mdi").addEventListener("click", (e) => {
+  const el = e.target.closest("code.copy");
+  if (el) copied(el, el.textContent);
+});
+$("c-copyall").addEventListener("click", (e) => copied(e.currentTarget, e.currentTarget.dataset.all));
+</script>
+</body>
+</html>
