@@ -25,11 +25,16 @@ follow from it), depth stepping, envelope checking, and a UI.
 
 Port these verbatim. None are style preferences.
 
-1. **`;@MKR|` header is mandatory, and its field order is load-bearing.**
-   Without it the controller shows no toolpath preview and the laser boundary
-   trace walks a zero-size box at X0 Y0 — while cutting the job perfectly, so
-   the failure is silent. `TOOL` entries must come **before** `TIME`. Seven
-   machine trips to pin down; see `EASYTRACE-Z1.md`.
+1. **Tool changes are written `T<n> M6`, never `M6 T<n>`.** Written `M6 T1`,
+   the controller shows no toolpath preview and the laser boundary trace only
+   goes to the work origin, while the job cuts perfectly, so the failure is
+   silent. For seven machine trips this was blamed on the `;@MKR|` header and
+   its field order (`TOOL` before `TIME`). The 2026-09-24 load tests showed the
+   header is not needed for the preview at all, and TIME before TOOL is
+   harmless. `--makera-style` had fixed it only because it also reorders
+   `M6 T<n>`. The header is still written: STOCK draws the stock box (always at
+   Anchor1), and the TOOL names are shown at each tool change. See
+   `EASYTRACE-Z1.md`, load tests.
 2. **The stepover between passes must be `G1`, not `G0`.** An early version
    rapided sideways with the cutter buried — 1.43mm of radial engagement at up
    to 3000 mm/min — and left a groove the neighbouring passes did not.
@@ -154,7 +159,7 @@ Keep it small. One generator module, pure functions, no framework needed:
 src/
   materials.ts     the table above, as data with a source comment per row
   facing.ts        serpentine path -> G1 lines. Pure: numbers in, strings out.
-  mkr.ts           the ;@MKR| header. Field ORDER is part of the contract.
+  mkr.ts           the ;@MKR| header, in Makera Studio's field order.
   gcode.ts         assembles header + preamble + body + trailer, CRLF
   validate.ts      the refusals above
   index.html       the form
@@ -176,8 +181,9 @@ What is worth testing, roughly in order of value:
    output for 80×60×0.3 in MDF has been run on the machine successfully. Port
    the script, generate the same job, and diff. That single test pins down the
    header, the ordering, the line endings and the path all at once.
-2. **`;@MKR|` field order** — assert `TOOL` precedes `TIME`, since that is the
-   one that failed silently.
+2. **`;@MKR|` field order** — assert `TOOL` precedes `TIME`. Believed then to be
+   the silent failure; since 2026-09-24 only a match to Makera's order. The
+   silent one is `M6 T<n>`, asserted in `test/gcode.test.ts`.
 3. **No `G0` while the tool is down** — assert directly, it is finding #2.
 4. **All Y coordinates ≤ 0** — finding #3.
 5. **CRLF throughout**; `T<n> M6` never split.
@@ -280,8 +286,9 @@ ship behaviour, per the global rules.
 - **CRLF was never the cause of the blank preview** (checked 2026-09-23). The
   story that a \r\n-splitting parser reads an LF file as one line, and so shows
   no preview, predates the finding that fixed it: `EASYTRACE-Z1.md` lists LF vs
-  CRLF among the six hypotheses tested on the machine that all FAILED, and the
-  cause was the header's field order. "Modal motion" is on the same list. The
+  CRLF among the six hypotheses tested on the machine that all FAILED. The
+  cause was the tool change written `M6 T<n>` (load tests 05/31, 2026-09-24),
+  and an LF file previews fine (08). "Modal motion" is on the same list. The
   files still get CRLF (matching Makera costs nothing), but the uploaded-file
   checker reports LF and bare coordinate lines as notes, and
   `test/check.test.ts` pins both so the old story cannot come back as a rule.

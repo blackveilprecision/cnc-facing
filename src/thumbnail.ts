@@ -1,12 +1,9 @@
 /**
  * Makera's three-line base64 PNG trailer -- the job-list preview.
  *
- * This is the OTHER half of "the controller shows a picture". The `;@MKR|` block
- * drives the toolpath preview pane and the laser boundary trace; this trailer
- * drives the tile in the job list. They fail independently, which is exactly
- * what made the original investigation confusing: a file with a thumbnail and no
- * `;@MKR|` block renders its tile perfectly and still previews blank and traces
- * a zero-size box.
+ * Only the picture: the tile in the job list and in Windows Explorer (for .nc;
+ * Explorer shows none for .cnc). The toolpath preview and the laser trace do not
+ * depend on it or on the `;@MKR|` block (load tests 19 and 23, 2026-09-24).
  *
  * Format (EASYTRACE-Z1.md): `;(thumbnail_image_begin)`, one `;`-prefixed base64
  * line, `;(thumbnail_image_end)`. Makera's own thumbnails are 800x600 PNGs,

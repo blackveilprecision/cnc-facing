@@ -11,15 +11,16 @@
  *   fail     the controller aborts, or the machine damages the bit or the work,
  *            or it breaks a limit this project enforces on its own files.
  *   silent   it runs, but something quietly does not happen: no preview, a
- *            boundary trace round a zero-size box at X0 Y0, no extraction.
+ *            boundary trace that only goes to the work origin, no extraction.
  *   warn     differs from what is known to work, or looks like a known mistake.
  *   note     worth knowing; includes the things that are genuinely UNKNOWN.
  *
  * What is NOT asserted matters as much. MILLING.md and EASYTRACE-Z1.md are
- * explicit about what was tested and failed to explain anything (CRLF on its
- * own), and what was never tested at all (the back-left ORIGIN form, literal
- * canned cycles, embedded G32). Those come out as warn or note, never fail,
- * because refusing a file on a guess is how a checker stops being believed.
+ * explicit about what was tested and turned out harmless (CRLF, the header's
+ * field order, most of the header itself: the 2026-09-24 load tests), and what
+ * was never tested at all (literal canned cycles, embedded G32). Those come out
+ * as warn or note, never fail, because refusing a file on a guess is how a
+ * checker stops being believed.
  *
  * Coordinates are tool CENTRES in work coordinates, Z0 on the stock top, which
  * is how every file this machine has run is written.
@@ -300,23 +301,22 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
 
   if (!/\.nc$/i.test(filename)) {
     out.add({
-      level: "warn", code: "extension",
+      level: "note", code: "extension",
       title: `The file is called .${filename.split(".").pop() ?? ""}, not .nc`,
-      detail: "The controller wants .nc. EasyTrace5000 writes .cnc, and those have to be renamed. What the controller does with other extensions (hides them, or refuses) is not recorded.",
+      detail: "A .cnc file loads, previews and traces like a .nc one (load test 20, 2026-09-24), but Windows Explorer shows no thumbnail for it. EasyTrace5000 writes .cnc. Other extensions have not been tried.",
       source: "EASYTRACE-Z1.md",
     });
   }
   if (lineEndings === "lf" || lineEndings === "mixed") {
-    // A NOTE, deliberately. CRLF was long blamed for the blank preview (the
-    // comments on writeGcode and fix_gcode.py's write_gcode still tell that
-    // story), but it was one of the six hypotheses tested on the machine that
-    // all FAILED; the cause was the header's field order. Nothing shows LF is
-    // harmful -- only that Makera writes CRLF and matching it costs nothing.
+    // A NOTE, deliberately. CRLF was long blamed for the blank preview, but an
+    // LF file previews and traces normally (load test 08, 2026-09-24). The cause
+    // was the tool change written M6 T<n>. Makera writes CRLF and matching it
+    // costs nothing; that is all.
     out.add({
       level: "note", code: "line-endings",
       title: lineEndings === "lf" ? "LF line endings, not CRLF" : "Mixed CRLF and LF line endings",
-      detail: "Makera Studio writes CRLF, and this app's own files match it. LF was tested on the machine as a cause of the blank preview and was not it (the cause was the header's field order), so this is only a difference from Makera's output.",
-      source: "EASYTRACE-Z1.md, 'How this was established'",
+      detail: "Makera Studio writes CRLF, and this app's own files match it. An LF file previews and traces normally (load test 08), so this is only a difference from Makera's output.",
+      source: "EASYTRACE-Z1.md, load tests 2026-09-24",
     });
   }
   // The thumbnail is base64, so this is about comments and typing, not bulk.
@@ -367,15 +367,16 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
 
   if (!mkr.length) {
     out.add({
-      level: "silent", code: "mkr-missing",
+      level: "warn", code: "mkr-missing",
       title: "No ;@MKR| header",
-      detail: "The job will load and cut, but the controller shows no toolpath preview and the laser boundary trace walks a zero-size box at X0 Y0, so the one check that would show a clamp in the path does nothing. EasyTrace5000's raw output has exactly this problem.",
-      source: "EASYTRACE-Z1.md; src/mkr.ts",
+      detail: "The preview and the laser boundary trace work without one (load tests 18 and 23, 2026-09-24). What is lost: no stock box in the Machining Wizard, and no tool names. Makera Studio shows each tool's name at the tool change, next to the LED count, and that text comes from the header's TOOL lines.",
+      source: "EASYTRACE-Z1.md, load tests 2026-09-24; src/mkr.ts",
     });
   } else {
-    // Field order is the contract (mkr.ts). Each tag must not come before one
-    // that the known-good order puts earlier. MAXFEEDRATE is optional -- Makera
-    // Studio's own file has none and previews -- so it is simply allowed.
+    // Makera Studio's field order, reported as a NOTE. TIME before TOOL was
+    // believed for seven machine trips to blank the preview, but a header in
+    // exactly that order previews and traces normally (load test 21,
+    // 2026-09-24). The real cause was the tool change written M6 T<n>.
     const order = MKR_FIELD_ORDER as readonly string[];
     let highest = -1;
     let highestTag = "";
@@ -392,31 +393,38 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       if (at < highest) {
         const timeFirst = m.tag === "TOOL" && highestTag === "TIME";
         out.add({
-          level: "silent", code: timeFirst ? "mkr-time-before-tool" : "mkr-order",
+          level: "note", code: timeFirst ? "mkr-time-before-tool" : "mkr-order",
           title: timeFirst ? "TIME comes before TOOL in the header" : `;@MKR|${m.tag} is out of order (after ${highestTag})`,
           detail: timeFirst
-            ? "This exact ordering blanked the preview and the boundary trace on this machine. It took seven trips to find. TOOL lines must all come before TIME."
-            : `The field order is load-bearing: ${order.join(" ")}. An out-of-order header is the kind of thing that blanks the preview without any error.`,
-          source: "EASYTRACE-Z1.md; src/mkr.ts",
+            ? "Long blamed for the blank preview, but a header in exactly this order previews and traces normally (load test 21). Only a difference from Makera Studio's order."
+            : `Makera Studio writes ${order.join(" ")}. The order has not been seen to matter (load test 21), so this is only a difference.`,
+          source: "EASYTRACE-Z1.md, load tests 2026-09-24; src/mkr.ts",
         }, m.line, rawLines[m.line - 1]);
       }
       if (at > highest) { highest = at; highestTag = m.tag; }
     }
     if (mkr[0]!.line !== 1 || mkr[0]!.tag !== "BEGIN") {
       out.add({
-        level: "warn", code: "mkr-not-first",
+        level: "note", code: "mkr-not-first",
         title: "The header does not start the file with ;@MKR|BEGIN",
-        detail: "Every Makera Studio file, and every file that has previewed here, opens with ;@MKR|BEGIN on line 1.",
+        detail: "Every Makera Studio file opens with ;@MKR|BEGIN on line 1. Where the header sits has not been seen to matter; a file with no header at all previews (load test 18).",
         source: "EASYTRACE-Z1.md",
       }, mkr[0]!.line, rawLines[mkr[0]!.line - 1]);
     }
+    // Tested one at a time on 2026-09-24 (load tests 09-15, 17): leaving any of
+    // these out changes nothing but the stock box, which only STOCK draws.
+    const MISSING: Record<string, string> = {
+      STOCK: "No stock box in the Machining Wizard; the preview and the laser trace are unaffected (load test 14). The box is always drawn at Anchor1, the bottom-left L-bracket, not at the work origin.",
+      ORIGIN: "No visible effect (load test 15): the toolpath is drawn at the probed work origin, and the stock box at Anchor1, whatever ORIGIN says.",
+      TIME: "No visible effect on the preview or the trace (load test 12).",
+    };
     for (const t of ["BEGIN", "SCHEMA", "MACHINE", "STOCK", "ORIGIN", "UNIT", "TIME", "END"]) {
       if (!tag(t)) {
         out.add({
-          level: "warn", code: `mkr-no-${t.toLowerCase()}`,
+          level: "note", code: `mkr-no-${t.toLowerCase()}`,
           title: `The header has no ${t} line`,
-          detail: `Every known-good header carries ;@MKR|${t}. Whether the controller tolerates its absence is not known.`,
-          source: "EASYTRACE-Z1.md, the header that works",
+          detail: MISSING[t] ?? `Makera Studio always writes ;@MKR|${t}. A minimal header without MATERIAL, CAM, MAXFEEDRATE, TIME or the TOOLPATH list previews and traces normally (load test 17); ${t} itself has not been left out on its own.`,
+          source: "EASYTRACE-Z1.md, load tests 2026-09-24",
         });
       }
     }
@@ -438,9 +446,9 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
     }
     if (origin && origin.typeName !== "topFrontLeft") {
       out.add({
-        level: "warn", code: "origin-type",
+        level: "note", code: "origin-type",
         title: `ORIGIN type_name=${origin.typeName}`,
-        detail: "topFrontLeft is the only type_name ever seen or tested. Other values may well work; nobody here has tried one.",
+        detail: "topFrontLeft is the only type_name ever seen. ORIGIN has no visible effect on the preview or the trace (load tests 15 and 16), so another value is very likely harmless; it has not been tried.",
         source: "MILLING.md; src/mkr.ts",
       }, originTag!.line, rawLines[originTag!.line - 1]);
     }
@@ -448,22 +456,22 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       out.add({
         level: "warn", code: "mkr-no-tools",
         title: "The header declares no tools",
-        detail: "Makera's header lists each bit with its real geometry, before TIME. Without them the controller has nothing to name at a tool change, and this checker cannot check depth against flute length.",
+        detail: "Makera Studio shows each tool's name at the tool change, next to the LED count, and the name comes from these TOOL lines. Without them the operator gets only the number, and this checker cannot check depth against flute length.",
       });
     }
     const toolpathsDeclared = mkr.filter((m) => m.tag === "TOOLPATH").length;
     if (toolpathStarts === 0) {
       out.add({
-        level: "warn", code: "no-toolpath-start",
+        level: "note", code: "no-toolpath-start",
         title: "No ;@MKR|TOOLPATH_START markers in the body",
-        detail: "Makera Studio puts one before each operation, pairing with the header's TOOLPATH list. Missing them was one of the hypotheses for the blank preview and did not explain it on its own, so this is a difference from known-good, not a known failure.",
-        source: "EASYTRACE-Z1.md",
+        detail: "Makera Studio puts one before each operation, pairing with the header's TOOLPATH list. A file without them previews and traces normally (load test 07), and Makera Studio shows no job list, so this is only a difference.",
+        source: "EASYTRACE-Z1.md, load tests 2026-09-24",
       });
     } else if (toolpathsDeclared !== toolpathStarts) {
       out.add({
-        level: "warn", code: "toolpath-count",
+        level: "note", code: "toolpath-count",
         title: `Header lists ${toolpathsDeclared} toolpaths, body starts ${toolpathStarts}`,
-        detail: "In a Makera Studio file these always match one for one.",
+        detail: "In a Makera Studio file these always match one for one. Neither has a visible effect on the Z1 (load tests 07 and 13).",
       });
     }
   }
@@ -474,7 +482,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
     out.add({
       level: "note", code: "no-thumbnail",
       title: "No thumbnail",
-      detail: "Cosmetic: the job list shows a blank tile beside the filename. The preview pane is driven by the ;@MKR| header, not by this.",
+      detail: "Cosmetic: the job list shows a blank tile beside the filename. The preview and the laser trace do not depend on it (load tests 19 and 23).",
       source: "README.md, 'Preview and thumbnail'",
     });
   } else if (thumbEnd !== thumbBegin + 2 || !rawLines[thumbBegin + 1]?.startsWith(";")) {
@@ -587,14 +595,14 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
 
     // A line that opens with a coordinate inherits the last G0-G3. Legal G-code,
     // and it cuts correctly. A NOTE: bare lines were blamed for the blank
-    // preview, but the file that was observed on also had TIME before TOOL,
-    // which was the real cause. Settled 2026-09-24: a modal file with a correct
-    // header previewed and boundary-traced normally on the Z1.
+    // preview, but the files it was observed on also wrote their tool changes
+    // M6 T<n>, which was the real cause. Settled 2026-09-24: a modal file
+    // previewed and boundary-traced normally on the Z1.
     if (/^[XYZIJ]/i.test(p.code)) {
       out.add({
         level: "note", code: "modal-motion",
         title: "Motion lines without a G word",
-        detail: "Bare coordinate lines inherit the last G0/G1/G2/G3. Fine on the Z1: a modal file with a correct ;@MKR| header previewed and boundary-traced like an explicit one (2026-09-24). They were once blamed for the blank preview, but that file also had TIME before TOOL, which was the real cause. Makera Studio writes a G word on every line; nothing requires it.",
+        detail: "Bare coordinate lines inherit the last G0/G1/G2/G3. Fine on the Z1: a modal file previewed and boundary-traced like an explicit one (2026-09-24). They were once blamed for the blank preview, but those files also wrote M6 T<n>, which was the real cause. Makera Studio writes a G word on every line; nothing requires it.",
         source: "EASYTRACE-Z1.md, 'Modal motion is fine'; cnc-facing README, 'Modal motion'",
       }, n, sample);
     }
@@ -657,20 +665,20 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       }
     }
 
-    // ---- tool changes. T and M6 on ONE line, either word order.
+    // ---- tool changes. T and M6 on ONE line, T first.
     const m6 = ms.includes(6);
     if (m6 && !t) {
       out.add({
         level: "fail", code: "m6-split",
         title: "M6 without a T word on the same line",
-        detail: "Split across two lines (FlatCAM does this), the controller aborts mid-job and drops its levelling heightmap. Write T1 M6, or M6 T1, on one line.",
+        detail: "Split across two lines (FlatCAM does this), the controller aborts mid-job and drops its levelling heightmap. Write T1 M6 on one line (T first: M6 T1 blanks the preview).",
         source: "PLAN.md non-negotiable 4; MILLING.md",
       }, n, sample);
     } else if (t && !m6) {
       out.add({
         level: "fail", code: "m6-split",
         title: "T word without M6 on the same line",
-        detail: "Split across two lines (FlatCAM does this), the controller aborts mid-job and drops its levelling heightmap. Write T1 M6, or M6 T1, on one line.",
+        detail: "Split across two lines (FlatCAM does this), the controller aborts mid-job and drops its levelling heightmap. Write T1 M6 on one line (T first: M6 T1 blanks the preview).",
         source: "PLAN.md non-negotiable 4; MILLING.md",
       }, n, sample);
     }
@@ -678,7 +686,19 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       tool = t.value;
       toolChanges.push(t.value);
       changedSinceSpindle = true;
-      if (ms.indexOf(6) < ws.indexOf(t) - 0 && /^M0*6\b/i.test(p.code)) styleDiffs.add("M6 T<n> word order (Makera Studio writes T<n> M6)");
+      // The one thing that blanks the preview and the laser trace. Load tests
+      // 05 and 31 (2026-09-24): the control file with only T1 M6 -> M6 T1
+      // changed loses its preview, and the trace only goes to the work origin.
+      // T1 M6 is fine, and the spindle's M3 S / S M3 order does not matter
+      // (32). The firmware runs either order, so nothing else says so.
+      if (ws.indexOf(ws.find((w) => w.letter === "M" && w.value === 6)!) < ws.indexOf(t)) {
+        out.add({
+          level: "silent", code: "m6-word-order",
+          title: `Tool change written M6 T${t.value}`,
+          detail: `The file cuts, but the controller shows no toolpath preview and the laser boundary trace only goes to the work origin, so the check that would show a clamp in the path does nothing. Write T${t.value} M6. EasyTrace5000 writes M6 T<n>; this is why its files never previewed.`,
+          source: "EASYTRACE-Z1.md, load tests 05 and 31 (2026-09-24)",
+        }, n, sample);
+      }
       if (spindle) {
         out.add({
           level: "warn", code: "m6-spindle-on",
@@ -906,9 +926,9 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
     });
   } else if (endCode.code === "M30") {
     out.add({
-      level: "silent", code: "m30",
+      level: "warn", code: "m30",
       title: "Ends with M30, not M2",
-      detail: "Makera's code list: M30 is 'End of the program, no action on the Carvera'. Accepted and inert. Makera Studio ends with M02; fix_gcode.py rewrites it.",
+      detail: "Makera's code list: M30 is 'End of the program, no action on the Carvera'. It loads, previews and traces normally (load tests 02 and 30, 2026-09-24); whether it ends a running program cleanly has not been tested. Makera Studio ends with M02; fix_gcode.py rewrites it.",
       source: "MILLING.md; kicad/fix_gcode.py",
     }, endCode.line, rawLines[endCode.line - 1]);
   }
@@ -941,8 +961,8 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
     out.add({
       level: "note", code: "layout",
       title: "Layout differs from Makera Studio's",
-      detail: `${[...styleDiffs].join("; ")}. Both spellings run. A file laid out like Makera Studio's is what finally previewed here, but which part of that layout mattered was never isolated, so this is only a difference, not a fault.`,
-      source: "EASYTRACE-Z1.md; kicad/fix_gcode.py, makera_style()",
+      detail: `${[...styleDiffs].join("; ")}. Both spellings run, and none of these affects the preview or the laser trace (load tests 02, 28 and 32, 2026-09-24). Only a difference from Makera Studio's layout.`,
+      source: "EASYTRACE-Z1.md, load tests 2026-09-24",
     });
   }
 
@@ -982,29 +1002,28 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
     const L = stock.length, W = stock.width, H = stock.height;
     const backLeft = Math.abs(origin.y - W / 2) < 0.01;
     const frontLeft = Math.abs(origin.y + W / 2) < 0.01;
-    // A NOTE: both origin conventions are valid and both have run here. Files
-    // from before the back-left convention (the garage opener) declare the
-    // front-left form over a -Y job, and they cut correctly. The most it can do
-    // is draw the controller's preview box on the other side of the origin.
+    // A NOTE: both origin conventions are valid and both have run here. And
+    // ORIGIN has no visible effect at all (load test 16, 2026-09-24): the stock
+    // box is drawn at Anchor1 and the toolpath at the probed work origin.
     if ((backLeft && yDirection === "positive") || (frontLeft && yDirection === "negative")) {
       out.add({
         level: "note", code: "origin-mismatch",
         title: `ORIGIN is declared ${backLeft ? "back" : "front"}-left, but the job runs into ${yDirection === "positive" ? "+" : "-"}Y`,
-        detail: `Both origin conventions are valid. This header uses the ${backLeft ? "back" : "front"}-left form while the coordinates run the other way, as files from before the back-left convention do. The cut does not depend on it; at most the controller draws its preview box on the other side of the origin. Zero where the coordinates say: the ${yDirection === "positive" ? "front" : "back"}-left corner.`,
+        detail: `Both origin conventions are valid. This header uses the ${backLeft ? "back" : "front"}-left form while the coordinates run the other way, as files from before the back-left convention do. The cut does not depend on it, and neither does the preview (load test 16). Zero where the coordinates say: the ${yDirection === "positive" ? "front" : "back"}-left corner.`,
         source: "MILLING.md; kicad/fix_gcode.py, mkr_header()",
       }, originTag!.line, rawLines[originTag!.line - 1]);
     } else if (!backLeft && !frontLeft) {
       out.add({
-        level: "warn", code: "origin-y",
+        level: "note", code: "origin-y",
         title: `ORIGIN y=${fmt(origin.y)} is neither edge of the ${fmt(W)}mm stock`,
-        detail: `Known-good headers put the origin on a stock edge: y=${fmt(-W / 2)} (front-left, +Y jobs) or y=${fmt(W / 2)} (back-left, -Y jobs).`,
+        detail: `Known-good headers put the origin on a stock edge: y=${fmt(-W / 2)} (front-left, +Y jobs) or y=${fmt(W / 2)} (back-left, -Y jobs). ORIGIN has no visible effect on the Z1 (load tests 15 and 16), so this is only a difference.`,
       }, originTag!.line, rawLines[originTag!.line - 1]);
     }
     if (Math.abs(origin.x + L / 2) > 0.01) {
       out.add({
-        level: "warn", code: "origin-x",
+        level: "note", code: "origin-x",
         title: `ORIGIN x=${fmt(origin.x)}, expected ${fmt(-L / 2)}`,
-        detail: "Every known-good header puts the origin on the stock's left edge, x = -length/2 from its centre.",
+        detail: "Every known-good header puts the origin on the stock's left edge, x = -length/2 from its centre. ORIGIN has no visible effect on the Z1 (load tests 15 and 16), so this is only a difference.",
       }, originTag!.line, rawLines[originTag!.line - 1]);
     }
     if (Number.isFinite(origin.z) && Math.abs(origin.z - H / 2) > 0.01) {

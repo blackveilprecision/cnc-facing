@@ -11,8 +11,12 @@
  *                                 having fallen out with suction running the
  *                                 whole time; the G-code was never at fault and
  *                                 a reordering tried as a guess was reverted.
- *   T1 M6 on ONE line             split across two lines the controller aborts
+ *   T1 M6 on ONE line, T first    split across two lines the controller aborts
  *                                 mid-job and loses its levelling heightmap.
+ *                                 Written M6 T1, the controller shows no
+ *                                 preview and the laser trace only goes to the
+ *                                 work origin (load tests 05/31, 2026-09-24).
+ *                                 The firmware runs either order.
  *                                 M6 is not something to avoid: it parks the
  *                                 head, shows the bit number on the LED strip
  *                                 and re-probes Z, so no manual re-zero.
@@ -183,11 +187,11 @@ export function buildJob(req: JobRequest, opts: BuildOptions = {}): BuildResult 
  *
  * Every file before 0.10.0 had a G word on every motion line, as Makera Studio
  * writes them, because bare lines were once blamed for the blank preview and the
- * zero-size boundary trace. That was only ever tested while the ;@MKR| header
- * had TIME before TOOL, which was the real cause (EASYTRACE-Z1.md, "How this was
- * established"). On 2026-09-24 a file from this function -- correct header, 69
- * bare lines, nothing else changed -- previewed and boundary-traced exactly like
- * the explicit one, so every file is written this way now.
+ * zero-size boundary trace. Those files also wrote their tool changes M6 T<n>,
+ * which was the real cause (EASYTRACE-Z1.md, load tests). On 2026-09-24 a file
+ * from this function -- 69 bare lines, nothing else changed -- previewed and
+ * boundary-traced exactly like the explicit one, so every file is written this
+ * way now.
  *
  * Only the G word goes; F stays on every line, so the test has one variable.
  * The mode is forgotten at anything that is not a plain G0-G3 line with
@@ -217,10 +221,10 @@ export function modalise(lines: string[]): string[] {
  * Both Makera sample files are CRLF throughout, and so is every file that has
  * previewed on this machine, so this matches them. It is NOT the fix for the
  * blank preview, though it was once believed to be (a \r\n splitter would read
- * an LF file as one line): EASYTRACE-Z1.md records LF vs CRLF as one of the six
- * hypotheses tested on the machine that all failed. The cause was the ;@MKR|
- * header's field order. Kept because matching the known-good file costs
- * nothing; the checker (check.ts) reports LF as a note, not a failure.
+ * an LF file as one line): an LF file previews and traces normally (load test
+ * 08, 2026-09-24). The cause was the tool change written M6 T<n>. Kept because
+ * matching the known-good file costs nothing; the checker (check.ts) reports LF
+ * as a note, not a failure.
  */
 export function writeGcode(lines: string[]): string {
   return lines.join(EOL) + EOL;

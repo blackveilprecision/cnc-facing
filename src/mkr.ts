@@ -1,15 +1,25 @@
 /**
- * The `;@MKR|` metadata header. FIELD ORDER IS PART OF THE CONTRACT.
+ * The `;@MKR|` metadata header, in Makera Studio's field order.
  *
- * This is the single most important thing in the project and it took seven
- * machine trips to pin down (EASYTRACE-Z1.md, "The `;@MKR|` header is required,
- * and its field order matters"). The controller reads this block to render the
- * toolpath preview AND to compute the laser boundary trace. Without it -- or
- * with one whose fields are in the wrong order -- both silently do nothing: the
- * file loads, the thumbnail renders, the machine cuts the job perfectly, and the
- * preview pane stays blank while the trace walks a zero-size box at X0 Y0.
+ * For seven machine trips this block, and TOOL-before-TIME in particular, was
+ * believed to be what makes the controller's toolpath preview and laser
+ * boundary trace work. The 2026-09-24 load tests (EASYTRACE-Z1.md) disproved
+ * that: a file with no header at all previews and traces normally, and so does
+ * one with TIME before TOOL. The real cause of every blank preview was the tool
+ * change written `M6 T<n>` instead of `T<n> M6`, which --makera-style happened
+ * to fix at the same time.
  *
- * The order, which MKR_FIELD_ORDER below encodes and the tests assert:
+ * What the header visibly does:
+ *
+ *   STOCK   draws the stock box in the Machining Wizard, always at Anchor1
+ *           (the machine's bottom-left L-bracket), never at the work origin.
+ *           Kept because users of Makera's tools expect a box.
+ *   TOOL    each tool's name, shown by Makera Studio at the tool change next
+ *           to the LED count. The most useful thing in here.
+ *
+ * Nothing else has a visible effect: MATERIAL, CAM, MAXFEEDRATE, TIME, the
+ * TOOLPATH list and ORIGIN were each left out without any change. Makera
+ * Studio's order is kept because matching the known-good file costs nothing:
  *
  *   BEGIN SCHEMA MACHINE MATERIAL STOCK ORIGIN CAM UNIT MAXFEEDRATE
  *   TOOL...        <- tools BEFORE time
@@ -17,15 +27,14 @@
  *   TOOLPATH...    <- then the toolpath list
  *   END
  *
- * TOOL-before-TIME is the specific one that failed: our files had TIME first,
- * which is what an order-sensitive parser would reject outright.
+ * (TIME before TOOL, once blamed, previews fine: load test 21.)
  */
 
 import type { ChamferPlan } from "./chamfer.ts";
 import type { FacingPath } from "./facing.ts";
 import { MAX_FEEDRATE } from "./materials.ts";
 
-/** Asserted by the tests. Changing this is changing what the machine accepts. */
+/** Makera Studio's order, asserted by the tests so the header keeps matching it. */
 export const MKR_FIELD_ORDER = [
   "BEGIN",
   "SCHEMA",

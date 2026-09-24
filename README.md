@@ -86,18 +86,20 @@ cut: 0.3mm MDF, 0.2mm aluminium, 0.1mm brass.
 
 ## Preview and thumbnail
 
-Two separate mechanisms that fail independently — which is what made the
-original investigation confusing.
+Three separate things, settled by the load tests of 2026-09-24:
 
-| | Drives | Comes from |
+| | What you see | Comes from |
 |---|---|---|
-| **Preview + laser boundary trace** | the controller's preview pane | the `;@MKR|` header block, `src/mkr.ts` |
+| **Preview + laser boundary trace** | the controller's preview pane, the trace | the toolpath itself, as long as tool changes are written `T<n> M6` |
+| **Stock box and tool names** | the box at Anchor1 in the Machining Wizard; the tool's name at each tool change | the `;@MKR|` header's STOCK and TOOL lines, `src/mkr.ts` |
 | **Job-list tile** | the picture beside the filename | the base64 PNG trailer, `src/thumbnail.ts` |
 
-A file with a thumbnail and no `;@MKR|` block renders its tile perfectly and
-still previews blank while the trace walks a zero-size box at X0 Y0. Both are
-emitted here, and the browser shows the same picture as SVG before you download,
-built from the same `Scene` so they cannot drift.
+For seven machine trips the blank preview was blamed on the `;@MKR|` header and
+its field order. It was the tool change written `M6 T1`: with only that changed,
+the preview goes blank and the laser trace only goes to the work origin. A file
+with no header and no thumbnail previews fine. Both are still emitted here, and
+the browser shows the same picture as SVG before you download, built from the
+same `Scene` so they cannot drift.
 
 The PNG is encoded in pure TypeScript (`src/png.ts`, palette + Up filter, no
 ImageMagick): about 1.6 KB for a typical job, so the whole `.nc` stays under 5 KB.
@@ -535,8 +537,8 @@ followed by `Y-45 F500`). Makera Studio, `surface_spoilboard.py` and every file
 before this put one on every line.
 
 **Settled on the machine 2026-09-24.** Bare lines were once blamed for the blank
-preview and the zero-size boundary trace, but that was only tested while the
-`;@MKR|` header had `TIME` before `TOOL`, which was the real cause. A 45 × 45
+preview and the zero-size boundary trace, but those files also wrote their tool
+changes `M6 T<n>`, which was the real cause. A 45 × 45
 aluminium job with overhang and chamfer, correct header and 69 bare lines was
 loaded next to the same file with a G word on every line. Both previewed and
 both traced the real outline.
@@ -558,9 +560,9 @@ out) and every rule cites where it was learned. It keeps four levels apart:
 | Level | Means | Examples |
 |---|---|---|
 | **Fail** | aborts, damages a bit or the work, or breaks a limit this app enforces | `T1` and `M6` on separate lines; feed above `MAXFEEDRATE`; cutting with the spindle off; more than 200mm of travel; a non-metal bit in metal |
-| **Silent** | runs, but the preview, boundary trace or extraction quietly does not happen | no `;@MKR|` block; `TIME` before `TOOL`; `M30`; `M7`/`M9` with no `M331` |
-| **Warning** | differs from what is known to work, or looks like a known mistake | over Makera's feed, plunge, depth per pass or chip load for the bit; `S1200`; a new spindle speed with no `M6`; deeper than the bit's flutes; a rapid through uncut stock; `.cnc`; bare coordinate lines; `G32` or canned cycles |
-| **Note** | worth knowing, including what is still untested | a recorded deviation from Makera's table; an `ORIGIN` on the other edge from the coordinates; LF line endings; no thumbnail |
+| **Silent** | runs, but the preview, boundary trace or extraction quietly does not happen | a tool change written `M6 T1` (blank preview, trace goes only to the origin); `M7`/`M9` with no `M331` |
+| **Warning** | differs from what is known to work, or looks like a known mistake | over Makera's feed, plunge, depth per pass or chip load for the bit; `S1200`; a new spindle speed with no `M6`; deeper than the bit's flutes; a rapid through uncut stock; no `;@MKR|` block (no stock box, no tool names at the tool change); `M30` (how it ends a running job is untested); `G32` or canned cycles |
+| **Note** | worth knowing, including what is still untested | a recorded deviation from Makera's table; `TIME` before `TOOL` or other header-order differences; a header field left out; `ORIGIN` values; `.cnc`; LF line endings; bare coordinate lines; no thumbnail |
 
 It also draws the toolpath against the declared stock and gives the same MDI
 reach walk as the generator, around the stock (or, with none declared, around
@@ -569,7 +571,8 @@ the material removed).
 **Two old stories are deliberately not failures.** CRLF line endings and bare
 coordinate lines were both blamed for the blank preview, and both are among
 the six hypotheses `EASYTRACE-Z1.md` records as tested on the machine and
-ruled out. The cause was the header's field order. So both are notes, and
+ruled out. The cause was the tool change written `M6 T<n>`, which the checker
+reports as silent. So both are notes, and
 `test/check.test.ts` pins both. Modal motion has since been tested on its own
 and is fine (see "Modal motion" above). This app still writes
 CRLF, because matching Makera costs nothing.
@@ -638,7 +641,7 @@ halves of the app cannot drift apart on what the machine wants.
 ```
 src/materials.ts   the speeds-and-feeds table, one source citation per row
     facing.ts      the four patterns -> G1 lines. Pure.
-    mkr.ts         the ;@MKR| header. Field ORDER is the contract.
+    mkr.ts         the ;@MKR| header, in Makera Studio's field order.
     validate.ts    the refusals
     summary.ts     the derived numbers, and the warnings that do not refuse
     reach.ts       the MDI corner walk, for the UI and for the .nc

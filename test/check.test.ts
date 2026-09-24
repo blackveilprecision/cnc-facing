@@ -90,8 +90,10 @@ describe("real files", () => {
     const r = checkGcode(await fixture("easytrace-B-back-RAW.cnc"), "easytrace-B-back-RAW.cnc");
     expect(r.verdict).toBe("silent");
     expect(codes(r)).toEqual(expect.arrayContaining([
-      "mkr-missing", "m30", "extension", "modal-motion", "missing-tool-change",
+      "m6-word-order", "mkr-missing", "m30", "extension", "modal-motion", "missing-tool-change",
     ]));
+    // M6 T1 is the one that blanks the preview (load tests 05/31, 2026-09-24).
+    expect(codes(r, "silent")).toContain("m6-word-order");
     // 475 bare lines, the number the examples README gives for this file.
     expect(r.findings.find((f) => f.code === "modal-motion")!.count).toBe(475);
   });
@@ -100,8 +102,8 @@ describe("real files", () => {
 describe("the CRLF and modal-motion stories are not asserted as failures", () => {
   // Both were blamed for the blank preview, and both are among the six
   // hypotheses EASYTRACE-Z1.md records as tested on the machine and FAILED --
-  // the cause was the header's field order. Modal motion was then tested on its
-  // own with a correct header (2026-09-24) and is fine. A checker that calls
+  // the cause was the tool change written M6 T<n> (load tests, 2026-09-24).
+  // Both were then tested on their own and are fine. A checker that calls
   // either a failure is repeating a disproved story.
   test("LF line endings alone are a note, and leave the verdict ok", () => {
     const r = checkGcode(generated().join("\n") + "\n", "job.nc");
@@ -124,13 +126,21 @@ describe("one thing broken", () => {
     expect(r.findings.find((f) => f.code === "m6-split")!.count).toBe(2);
   });
 
-  test("M6 T1 is accepted -- both word orders run -- and only noted as a layout difference", () => {
+  test("M6 T1 is silent: it cuts, but the preview is blank and the trace goes only to the origin", () => {
+    // Load tests 05 and 31 (2026-09-24). The firmware runs either order.
     const r = mutate(replace("T1 M6", "M6 T1"));
+    expect(r.verdict).toBe("silent");
+    expect(codes(r, "silent")).toEqual(["m6-word-order"]);
+    expect(codes(r)).not.toContain("layout");
+  });
+
+  test("M3 S12000 word order is only a layout note (load test 32)", () => {
+    const r = mutate((ls) => ls.map((l) => l.replace(/^S(\d+) M3$/, "M3 S$1")));
     expect(serious(r)).toEqual([]);
     expect(codes(r)).toContain("layout");
   });
 
-  test("TIME before TOOL is the silent failure that took seven trips", () => {
+  test("TIME before TOOL is only a note: it previews fine (load test 21), though it was blamed for seven trips", () => {
     const r = mutate((ls) => {
       const t = ls.findIndex((l) => l.startsWith(";@MKR|TIME"));
       const time = ls[t]!;
@@ -138,12 +148,14 @@ describe("one thing broken", () => {
       out.splice(out.findIndex((l) => l.startsWith(";@MKR|TOOL|")), 0, time);
       return out;
     });
-    expect(codes(r, "silent")).toContain("mkr-time-before-tool");
+    expect(codes(r, "note")).toContain("mkr-time-before-tool");
+    expect(serious(r)).toEqual([]);
   });
 
-  test("no header at all is silent", () => {
+  test("no header at all warns, not silent: preview and trace work without one (load tests 18, 23)", () => {
     const r = mutate((ls) => ls.filter((l) => !l.startsWith(";@MKR|")));
-    expect(codes(r, "silent")).toContain("mkr-missing");
+    expect(codes(r, "warn")).toContain("mkr-missing");
+    expect(codes(r, "silent")).toEqual([]);
   });
 
   test("a feed over MAXFEEDRATE fails", () => {
@@ -168,9 +180,9 @@ describe("one thing broken", () => {
     expect(codes(r, "fail")).toContain("envelope");
   });
 
-  test("M30 instead of M02 is silent: accepted and inert", () => {
+  test("M30 instead of M02 is a warning: loads and previews, runtime end untested", () => {
     const r = mutate(replace("M02", "M30"));
-    expect(codes(r, "silent")).toContain("m30");
+    expect(codes(r, "warn")).toContain("m30");
   });
 
   test("M7/M9 in place of M331/M332 is silent: accepted, and nothing happens", () => {
@@ -215,8 +227,8 @@ describe("one thing broken", () => {
     expect(codes(r, "warn")).toContain("outside-stock");
   });
 
-  test("the wrong extension warns", () => {
-    expect(codes(mutate((ls) => ls, "job.cnc"), "warn")).toContain("extension");
+  test("a .cnc extension is only a note: it loads and previews (load test 20)", () => {
+    expect(codes(mutate((ls) => ls, "job.cnc"), "note")).toContain("extension");
   });
 
   test("an embedded G32 warns, it is not refused: what it does is unknown", () => {

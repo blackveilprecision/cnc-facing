@@ -5,6 +5,8 @@
 
 import { describe, expect, test } from "bun:test";
 import { buildJob, EOL, filenameFor, VERSION } from "../src/gcode.ts";
+import { PATTERNS } from "../src/facing.ts";
+import { MATERIAL_IDS } from "../src/materials.ts";
 
 const REQ = { width: 80, height: 60, depth: 0.3, material: "mdf", stepover: 0.45 } as const;
 const AT = new Date(2026, 8, 21, 14, 5);
@@ -18,8 +20,8 @@ function build(over: object = {}, opts: object = { thumbnail: false }) {
 describe("line endings", () => {
   test("CRLF throughout, including the last line", () => {
     // Matches Makera Studio's output. Not the cause of the blank preview, which
-    // it was once blamed for -- LF was tested on the machine and ruled out; the
-    // header's field order was the cause (EASYTRACE-Z1.md). See writeGcode.
+    // it was once blamed for -- an LF file previews fine (load test 08); the
+    // cause was the tool change written M6 T<n> (EASYTRACE-Z1.md). See writeGcode.
     const { gcode } = build();
     expect(gcode.endsWith(EOL)).toBe(true);
     expect(gcode.split("\n").length - 1).toBe(gcode.split("\r\n").length - 1);
@@ -50,6 +52,31 @@ describe("the preamble and trailer", () => {
     // levelling heightmap.
     expect(lines.filter((l) => /\bM6\b/.test(l))).toEqual(["T1 M6"]);
     expect(lines.some((l) => l.trim() === "T1" || l.trim() === "M6")).toBe(false);
+  });
+
+  test("no job ever writes M6 T<n>: every tool change is T<n> M6", () => {
+    // M6 T1 blanks the controller's preview and stops the laser trace at the
+    // work origin, silently (load tests 05 and 31, 2026-09-24). Every
+    // material, bit, mode and pattern, with and without the chamfer's T2.
+    let changes = 0;
+    for (const material of MATERIAL_IDS) {
+      for (const mode of ["general", "finish"] as const) {
+        for (const pattern of mode === "finish" ? [undefined] : PATTERNS) {
+          for (const chamfer of [undefined, 0.2]) {
+            const r = buildJob(
+              { width: 45, height: 45, depth: 0.3, material, stepover: 0.45, mode, pattern, overhang: !!chamfer, chamfer },
+              { now: AT, thumbnail: false },
+            );
+            if (!r.ok) continue;
+            const m6 = r.lines.filter((l) => /\bM0*6\b/.test(l));
+            expect(m6.every((l) => /^T\d+ M6$/.test(l))).toBe(true);
+            expect(r.lines.some((l) => /^M0*6\s*T/.test(l))).toBe(false);
+            changes += m6.length;
+          }
+        }
+      }
+    }
+    expect(changes).toBeGreaterThan(20);
   });
 
   test("the spindle dwells before the first cut", () => {

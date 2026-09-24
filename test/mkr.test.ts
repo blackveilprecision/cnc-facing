@@ -1,5 +1,9 @@
 /**
- * The `;@MKR|` block. Field ORDER is the thing that took seven machine trips.
+ * The `;@MKR|` block, in Makera Studio's field order. For seven machine trips
+ * the order (TOOL before TIME) was believed to make the preview work; the
+ * 2026-09-24 load tests showed it does not matter, and neither does the header
+ * itself. The real cause was `M6 T<n>` (test/gcode.test.ts). Kept matching
+ * Makera because it costs nothing; STOCK draws the box and TOOL names the bit.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -28,7 +32,7 @@ function headerTags(lines: string[]): string[] {
 }
 
 describe("the ;@MKR| header", () => {
-  test("TOOL comes before TIME — the field that failed silently", () => {
+  test("TOOL comes before TIME, as Makera Studio writes it", () => {
     const tags = headerTags(build().lines);
     expect(tags.indexOf("TOOL")).toBeGreaterThan(-1);
     expect(tags.indexOf("TIME")).toBeGreaterThan(tags.indexOf("TOOL"));
