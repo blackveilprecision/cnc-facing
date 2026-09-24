@@ -10,6 +10,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { buildJob } from "../src/gcode.ts";
+import { explicit } from "./explicit.ts";
 import { CLEAR_Z, PATTERNS, SAFE_Z, type Pattern } from "../src/facing.ts";
 import { validate, type JobRequest } from "../src/validate.ts";
 
@@ -20,7 +21,7 @@ const BASE = {
 function build(over: Partial<JobRequest> = {}) {
   const r = buildJob({ ...BASE, ...over } as JobRequest, { thumbnail: false, now: new Date(2026, 8, 22) });
   if (!r.ok) throw new Error(JSON.stringify(r.refusals));
-  return r;
+  return { ...r, lines: explicit(r.lines) };
 }
 
 interface P { x: number; y: number }

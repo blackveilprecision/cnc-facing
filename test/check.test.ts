@@ -13,6 +13,7 @@ import { describe, expect, test } from "bun:test";
 import { checkGcode, parseLine, type CheckReport, type Level } from "../src/check.ts";
 import { reportToSvg } from "../src/checksvg.ts";
 import { buildJob, writeGcode } from "../src/gcode.ts";
+import { explicit } from "./explicit.ts";
 import { PATTERNS } from "../src/facing.ts";
 import { MATERIAL_IDS } from "../src/materials.ts";
 import { reachCheck, reachWalk } from "../src/reach.ts";
@@ -28,7 +29,9 @@ const serious = (r: CheckReport) => r.findings.filter((f) => f.level !== "note")
 function generated(over: object = {}): string[] {
   const b = buildJob({ width: 80, height: 60, depth: 0.3, material: "mdf", stepover: 0.45, ...over });
   if (!b.ok) throw new Error(JSON.stringify(b.refusals));
-  return b.lines;
+  // Explicit, so each mutation below can find its line by G word. The modal
+  // file as written is checked in modal.test.ts.
+  return explicit(b.lines);
 }
 
 /** A known-good file with one edit, re-serialised the way the generator does. */
@@ -97,8 +100,9 @@ describe("real files", () => {
 describe("the CRLF and modal-motion stories are not asserted as failures", () => {
   // Both were blamed for the blank preview, and both are among the six
   // hypotheses EASYTRACE-Z1.md records as tested on the machine and FAILED --
-  // the cause was the header's field order. A checker that calls them silent
-  // failures is repeating a disproved story.
+  // the cause was the header's field order. Modal motion was then tested on its
+  // own with a correct header (2026-09-24) and is fine. A checker that calls
+  // either a failure is repeating a disproved story.
   test("LF line endings alone are a note, and leave the verdict ok", () => {
     const r = checkGcode(generated().join("\n") + "\n", "job.nc");
     expect(r.stats.lineEndings).toBe("lf");
@@ -106,9 +110,10 @@ describe("the CRLF and modal-motion stories are not asserted as failures", () =>
     expect(r.verdict).toBe("ok");
   });
 
-  test("bare coordinate lines are a warning, not a silent failure", () => {
+  test("bare coordinate lines are a note (settled on the machine 2026-09-24)", () => {
     const r = mutate((ls) => ls.map((l) => l.replace(/^G1 (X)/, "$1")));
-    expect(r.findings.find((f) => f.code === "modal-motion")!.level).toBe("warn");
+    expect(r.findings.find((f) => f.code === "modal-motion")!.level).toBe("note");
+    expect(r.verdict).toBe("ok");
   });
 });
 

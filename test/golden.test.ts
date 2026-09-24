@@ -17,7 +17,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { buildJob } from "../src/gcode.ts";
+import { buildJob, modalise } from "../src/gcode.ts";
 
 const FIXTURE = "test/fixtures/surface_spoilboard-80x60x0.3.nc";
 
@@ -44,8 +44,10 @@ describe("golden: surface_spoilboard.py 80 x 60 x 0.3 MDF", () => {
     expect(reference.filter((l) => l.startsWith("G1 X")).length).toBe(41);
   });
 
-  test("every motion line is identical", () => {
-    expect(ours).toEqual(reference);
+  test("every motion line is identical, once the repeated G words are dropped", () => {
+    // The script writes a G word on every line; since 0.10.0 this app writes
+    // modal motion (see modalise). Nothing else may differ.
+    expect(ours).toEqual(modalise(reference));
   });
 
   test("and there are no extra or missing lines", () => {

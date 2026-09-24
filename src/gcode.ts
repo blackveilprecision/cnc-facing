@@ -25,6 +25,10 @@
  *   no G2/G3                      facing is all G1. The Z1 handles arcs, but
  *                                 Makera Studio emits none and there is no
  *                                 reason to be the first to try here.
+ *
+ *   modal motion                  a G word only where the motion mode changes,
+ *                                 not on every line. Settled on the machine
+ *                                 2026-09-24 -- see modalise().
  */
 
 import pkg from "../package.json" with { type: "json" };
@@ -156,6 +160,7 @@ export function buildJob(req: JobRequest, opts: BuildOptions = {}): BuildResult 
     "M02",
   ];
 
+  lines.splice(0, lines.length, ...modalise(lines));
   if (opts.thumbnail !== false) lines.push(...thumbnailLines(sceneToPng(scene)));
 
   return {
@@ -170,6 +175,40 @@ export function buildJob(req: JobRequest, opts: BuildOptions = {}): BuildResult 
     summary: summarise(path, stock, chamfer),
     reach: reachCheck(req),
   };
+}
+
+/**
+ * Drop the G word from a motion line that repeats the previous one's, the way
+ * EasyTrace writes its files (`G1 X10 F800` then `Y-5 F800`).
+ *
+ * Every file before 0.10.0 had a G word on every motion line, as Makera Studio
+ * writes them, because bare lines were once blamed for the blank preview and the
+ * zero-size boundary trace. That was only ever tested while the ;@MKR| header
+ * had TIME before TOOL, which was the real cause (EASYTRACE-Z1.md, "How this was
+ * established"). On 2026-09-24 a file from this function -- correct header, 69
+ * bare lines, nothing else changed -- previewed and boundary-traced exactly like
+ * the explicit one, so every file is written this way now.
+ *
+ * Only the G word goes; F stays on every line, so the test has one variable.
+ * The mode is forgotten at anything that is not a plain G0-G3 line with
+ * coordinates -- M6 above all, whose macro runs its own G53 G0 and G38.6
+ * probes and so leaves the controller in a motion mode this file never set.
+ * The first move after it is therefore always written out in full.
+ */
+export function modalise(lines: string[]): string[] {
+  let cur: string | null = null;
+  return lines.map((l) => {
+    const m = /^(G[0-3]) ([XYZ].*)$/.exec(l);
+    if (!m) {
+      // Comments and blank lines leave the mode alone; any other code resets it.
+      if (l !== "" && !l.startsWith(";") && !l.startsWith("(")) cur = null;
+      return l;
+    }
+    const [, word, rest] = m;
+    if (word === cur) return rest!;
+    cur = word!;
+    return l;
+  });
 }
 
 /**

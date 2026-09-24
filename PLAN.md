@@ -283,8 +283,11 @@ ship behaviour, per the global rules.
   CRLF among the six hypotheses tested on the machine that all FAILED, and the
   cause was the header's field order. "Modal motion" is on the same list. The
   files still get CRLF (matching Makera costs nothing), but the uploaded-file
-  checker reports LF as a note and bare coordinate lines as a warning, and
+  checker reports LF and bare coordinate lines as notes, and
   `test/check.test.ts` pins both so the old story cannot come back as a rule.
+  Modal motion was later tested on its own, with a correct header, and is fine
+  (2026-09-24). Since 0.10.0 every file this app writes is modal (README,
+  "Modal motion").
 - **A checker for files this app did not write** (0.8.0, 2026-09-23). The
   "Check a file" tab reads any `.nc` and reports against everything above, and
   against Makera's own speeds and feeds for each bit it identifies. Depth per

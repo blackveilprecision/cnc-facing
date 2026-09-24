@@ -45,7 +45,9 @@ including the one that serves the form, because Bun matches `routes` before the
 `~/src/ha/esp/garasje/kicad/surface_spoilboard.py`, which has been run on the
 machine. Its 80 × 60 × 0.3 MDF output is committed at
 `test/fixtures/surface_spoilboard-80x60x0.3.nc`, and `test/golden.test.ts`
-asserts that this app's motion for the same job is **byte-identical** to it. That
+asserts that this app's motion for the same job is **byte-identical** to it once
+the script's repeated G words are dropped (this app writes modal motion; see
+"Modal motion"). That
 one test pins the path, the coordinate convention, the feed words and the
 G1-not-G0 stepover at once. The header differs on purpose (different CAM id, a
 real time estimate, a thumbnail the script never emitted); its structural
@@ -525,6 +527,27 @@ changed was how tall the controller draws its preview box, via
 the stock, which never comes up on a skim. The header now always declares 12mm,
 the value in the `surface_spoilboard.py` file this machine has run.
 
+## Modal motion
+
+Since 0.10.0 every file is **modal**: a motion line carries a G word only where
+the motion mode changes, the way EasyTrace writes its files (`G1 X10 F500`
+followed by `Y-45 F500`). Makera Studio, `surface_spoilboard.py` and every file
+before this put one on every line.
+
+**Settled on the machine 2026-09-24.** Bare lines were once blamed for the blank
+preview and the zero-size boundary trace, but that was only tested while the
+`;@MKR|` header had `TIME` before `TOOL`, which was the real cause. A 45 × 45
+aluminium job with overhang and chamfer, correct header and 69 bare lines was
+loaded next to the same file with a G word on every line. Both previewed and
+both traced the real outline.
+
+F stays on every feed move. The first move after each `M6` is written in full,
+because the tool-change macro runs its own moves and probes and leaves the
+controller in a motion mode the file never set. The golden test compares the
+motion with `surface_spoilboard.py`'s once its repeated G words are dropped, and
+nothing else may differ. The geometry tests read the lines through
+`test/explicit.ts`, which puts the G words back.
+
 ## Checking a file from somewhere else
 
 The **Check a file** tab (`/#check`) takes any `.nc` (from Makera Studio,
@@ -546,8 +569,9 @@ the material removed).
 **Two old stories are deliberately not failures.** CRLF line endings and bare
 coordinate lines were both blamed for the blank preview, and both are among
 the six hypotheses `EASYTRACE-Z1.md` records as tested on the machine and
-ruled out. The cause was the header's field order. So LF is a note and modal
-motion is a warning, and `test/check.test.ts` pins both. This app still writes
+ruled out. The cause was the header's field order. So both are notes, and
+`test/check.test.ts` pins both. Modal motion has since been tested on its own
+and is fine (see "Modal motion" above). This app still writes
 CRLF, because matching Makera costs nothing.
 
 **Both origin conventions are valid.** Files from before the back-left

@@ -9,6 +9,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { buildJob } from "../src/gcode.ts";
+import { explicit } from "./explicit.ts";
 import { MATERIALS, resolve } from "../src/materials.ts";
 import { validate, type JobRequest } from "../src/validate.ts";
 
@@ -19,7 +20,7 @@ const BASE = {
 function build(over: Partial<JobRequest> = {}) {
   const r = buildJob({ ...BASE, ...over } as JobRequest, { thumbnail: false });
   if (!r.ok) throw new Error(JSON.stringify(r.refusals));
-  return r;
+  return { ...r, lines: explicit(r.lines) };
 }
 
 const motion = (over: Partial<JobRequest> = {}) =>

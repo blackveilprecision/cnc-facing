@@ -49,6 +49,16 @@ const ALLOW = parseAllow(process.env.CNC_FACING_ALLOW ?? DEFAULT_ALLOW);
  */
 const SCP_TARGET = process.env.CNC_FACING_SCP_TARGET ?? "";
 
+/**
+ * A checkbox: FormData sends "on" when ticked and nothing when not. JSON
+ * callers may send a boolean. Anything else is passed on for validate() to
+ * refuse.
+ */
+function checkbox(v: unknown): boolean | undefined {
+  if (v === undefined || v === false || v === "") return undefined;
+  return v === true || v === "on" || v === "true" ? true : (v as never);
+}
+
 function parseRequest(body: unknown): JobRequest {
   const b = (body ?? {}) as Record<string, unknown>;
   const num = (v: unknown) => (v === "" || v === null || v === undefined ? Number.NaN : Number(v));
@@ -62,11 +72,7 @@ function parseRequest(body: unknown): JobRequest {
   return {
     width: num(b.width),
     height: num(b.height),
-    // A checkbox: FormData sends "on" when ticked and nothing when not. JSON
-    // callers may send a boolean. Anything else is refused by validate().
-    overhang: b.overhang === undefined || b.overhang === false || b.overhang === ""
-      ? undefined
-      : b.overhang === true || b.overhang === "on" || b.overhang === "true" ? true : (b.overhang as never),
+    overhang: checkbox(b.overhang),
     // Sent only when the chamfer box is ticked; blank means none.
     chamfer: b.chamfer === undefined || b.chamfer === "" ? undefined : num(b.chamfer),
     depth: num(b.depth),

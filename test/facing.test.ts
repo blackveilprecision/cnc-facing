@@ -8,6 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { gcodeBody, planFacing, splitDepth } from "../src/facing.ts";
 import { MATERIALS, DEFAULT_STEPOVER, resolve, type MaterialId } from "../src/materials.ts";
 import { buildJob } from "../src/gcode.ts";
+import { explicit } from "./explicit.ts";
 
 // Pinned to serpentine-x, the ported pattern these tests were written against.
 // The default moved to serpentine-y in 0.9.0; patterns.test.ts checks the same
@@ -24,7 +25,7 @@ const plan = (w: number, h: number, d: number, m: MaterialId = "mdf", tool?: "3.
 function allLines(w: number, h: number, d: number, m: MaterialId = "mdf") {
   const r = buildJob({ width: w, height: h, depth: d, material: m, stepover: DEFAULT_STEPOVER, pattern: "serpentine-x" }, { thumbnail: false });
   if (!r.ok) throw new Error(JSON.stringify(r.refusals));
-  return r.lines;
+  return explicit(r.lines);
 }
 
 describe("the stepover is never a rapid", () => {

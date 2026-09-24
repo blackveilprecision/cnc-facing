@@ -586,16 +586,16 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
     const f = ws.find((w) => w.letter === "F");
 
     // A line that opens with a coordinate inherits the last G0-G3. Legal G-code,
-    // and it cuts correctly. A WARN, not silent: bare lines were blamed for the
-    // blank preview, but "modal motion" is one of the six hypotheses that FAILED
-    // on the machine -- the file it was observed on also had TIME before TOOL,
-    // which was the real cause. Same evidence shape as the CRLF story.
+    // and it cuts correctly. A NOTE: bare lines were blamed for the blank
+    // preview, but the file that was observed on also had TIME before TOOL,
+    // which was the real cause. Settled 2026-09-24: a modal file with a correct
+    // header previewed and boundary-traced normally on the Z1.
     if (/^[XYZIJ]/i.test(p.code)) {
       out.add({
-        level: "warn", code: "modal-motion",
+        level: "note", code: "modal-motion",
         title: "Motion lines without a G word",
-        detail: "Bare coordinate lines inherit the last G0/G1/G2/G3, and the machine cuts them correctly. Makera Studio writes a G word on every motion line, and fix_gcode.py's demodalise() puts them back. They were once blamed for the blank preview, but fixing them alone did not bring it back (the header's field order did), so whether the preview or boundary trace cares is not established.",
-        source: "EASYTRACE-Z1.md, 'How this was established'; kicad/fix_gcode.py, demodalise()",
+        detail: "Bare coordinate lines inherit the last G0/G1/G2/G3. Fine on the Z1: a modal file with a correct ;@MKR| header previewed and boundary-traced like an explicit one (2026-09-24). They were once blamed for the blank preview, but that file also had TIME before TOOL, which was the real cause. Makera Studio writes a G word on every line; nothing requires it.",
+        source: "EASYTRACE-Z1.md, 'Modal motion is fine'; cnc-facing README, 'Modal motion'",
       }, n, sample);
     }
 

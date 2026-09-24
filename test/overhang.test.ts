@@ -14,6 +14,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { buildJob } from "../src/gcode.ts";
+import { explicit } from "./explicit.ts";
 import { PATTERNS } from "../src/facing.ts";
 import { resolve } from "../src/materials.ts";
 import { validate, type JobRequest } from "../src/validate.ts";
@@ -26,7 +27,7 @@ const R = resolve("aluminium")!.tool.diameter / 2;
 function build(over: Partial<JobRequest> = {}) {
   const r = buildJob({ ...BASE, ...over } as JobRequest, { thumbnail: false, now: new Date(2026, 8, 24) });
   if (!r.ok) throw new Error(JSON.stringify(r.refusals));
-  return r;
+  return { ...r, lines: explicit(r.lines) };
 }
 
 /** Every XY the tool centre visits while below Z0, read back from the lines. */

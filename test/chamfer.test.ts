@@ -9,6 +9,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { buildJob } from "../src/gcode.ts";
+import { explicit } from "./explicit.ts";
 import { MKR_FIELD_ORDER, mkrTag } from "../src/mkr.ts";
 import { validate, type JobRequest } from "../src/validate.ts";
 
@@ -19,7 +20,7 @@ const BASE = {
 function build(over: Partial<JobRequest> = {}) {
   const r = buildJob({ ...BASE, chamfer: 0.2, ...over } as JobRequest, { thumbnail: false, now: new Date(2026, 8, 24) });
   if (!r.ok) throw new Error(JSON.stringify(r.refusals));
-  return r;
+  return { ...r, lines: explicit(r.lines) };
 }
 
 /** The lines after the tool change to T2. */
