@@ -208,7 +208,10 @@ ship behaviour, per the global rules.
    tool's end face, so cut direction governs the stepover ridge and not the
    surface, and spindle tram dominates either way. One-direction climb also
    doubles the finishing pass and leaves a row of plunge marks along the start
-   edge. Revisit if a test coupon shows the alternation.
+   edge. Revisit if a test coupon shows the alternation. **Revisited
+   2026-09-23:** a Serpentine Y coupon *shows* it (alternate bands look
+   different under light) but feels as flat as One-way Y, so serpentine stays,
+   now along Y, as the general default from 0.9.0. README, "Results so far".
 4. ~~**Where does the file land?**~~ **Browser download**, plus the
    `latest-facing.nc` symlink and scp commands printed in the summary when
    `CNC_FACING_SCP_TARGET` is set. No server-side writes.
@@ -257,8 +260,10 @@ ship behaviour, per the global rules.
   minute of clicking, which is how the check gets skipped. MDI takes a single
   absolute move, so `src/reach.ts` emits the walk as seven lines — in the UI
   with click-to-copy, and as a comment block in the `.nc` so the file carries
-  its own instructions. It walks the stock corners, which is what the laser
-  boundary trace follows.
+  its own instructions. It walks the stock corners. (This said until 0.9.0
+  that the stock corners are also what the laser boundary trace follows. They
+  are not: the trace follows the tool centre, a tool radius inside the stock
+  with no overhang. See README, "The laser trace and the overhang".)
 - **Corner fillets are a non-issue in practice**, confirmed 2026-09-21: stock in
   the vice gets faced a few mm oversize, putting them outside the part. Still
   drawn, and mentioned once in the summary, for the case where the faced area is

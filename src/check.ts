@@ -1025,12 +1025,29 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
         cutExtents.y1 > yhi + STOCK_SLACK && `Y ${fmt(cutExtents.y1)} is past its edge at ${fmt(yhi)}`,
       ].filter(Boolean);
       if (over.length) {
-        out.add({
-          level: "warn", code: "outside-stock",
-          title: "The cut reaches outside the declared stock",
-          detail: `${over.join("; ")} (tool radius included). The controller draws the preview inside the STOCK box, so a job outside it renders wrong, and a cut outside the stock you actually clamped is a cut into the vice or the bed. A profile cutout that deliberately runs a tool radius past the part is the common harmless case.`,
-          source: "kicad/fix_gcode.py, fits_stock()",
-        }, stockTag!.line, rawLines[stockTag!.line - 1]);
+        // No further past the stock than the radius of a bit the file uses is
+        // an overhang: a facing job run past every edge on purpose (cnc-facing's
+        // Overhang box, run on this machine 2026-09-24), or a profile cutout
+        // that runs a tool radius past the part. Further than that is the case
+        // worth a warning: a cut into the vice or the bed.
+        const worst = Math.max(
+          -cutExtents.x0, cutExtents.x1 - L, ylo - cutExtents.y0, cutExtents.y1 - yhi,
+        );
+        const radius = Math.max(0, ...tools.map((t) => (t.tipDiameter ?? t.diameter ?? 0) / 2));
+        const overhang = worst <= radius + STOCK_SLACK;
+        out.add(overhang
+          ? {
+              level: "note", code: "outside-stock",
+              title: `Cuts up to ${fmt(worst)}mm past the declared stock: an overhang`,
+              detail: `${over.join("; ")} (tool radius included). That is within one ${fmt(2 * radius)}mm bit's radius, as a facing job run past every edge or a profile cutout does. Make sure nothing but air is there.`,
+              source: "kicad/fix_gcode.py, fits_stock()",
+            }
+          : {
+              level: "warn", code: "outside-stock",
+              title: "The cut reaches outside the declared stock",
+              detail: `${over.join("; ")} (tool radius included), further than a bit's radius. The controller draws the preview inside the STOCK box, so a job outside it renders wrong, and a cut outside the stock you actually clamped is a cut into the vice or the bed.`,
+              source: "kicad/fix_gcode.py, fits_stock()",
+            }, stockTag!.line, rawLines[stockTag!.line - 1]);
       }
     }
     if (zMin !== null && -zMin > H + 0.5) {

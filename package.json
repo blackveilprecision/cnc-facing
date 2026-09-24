@@ -1,6 +1,6 @@
 {
   "name": "cnc-facing",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Facing-job generator for the Makera Z1",
   "private": true,
   "type": "module",

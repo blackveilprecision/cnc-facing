@@ -1,7 +1,7 @@
 /**
  * The toolpath. Pure: numbers in, geometry and G-code strings out.
  *
- * The default pattern is a port of `surface_spoilboard.py`'s `facing()` from
+ * The serpentine-x pattern is a port of `surface_spoilboard.py`'s `facing()` from
  * ~/src/ha/esp/garasje/kicad, generalised to multiple depth passes. That script
  * has been run on the machine and its output is the golden fixture in
  * test/fixtures; for a single-pass MDF job this module emits the same motion
@@ -18,17 +18,28 @@
  *     Every job on this machine must sweep the same way from the same datum, or
  *     one origin cannot serve both this and the PCB jobs.
  *  3. The tool CENTRE runs from r to W-r, so the SWEPT area is exactly 0..W.
- *     That is what makes "face 80x60" mean what the user expects.
+ *     That is what makes "face 80x60" mean what the user expects. With an
+ *     overhang o it runs from r-o to W-(r-o), and the swept area is -o..W+o:
+ *     the block is still W, the cutter just goes o past each edge of it.
+ *
+ * OVERHANG
+ *
+ * Capped at the tool radius, so r-o is never negative and the
+ * tool centre never goes behind or left of X0 Y0 -- rule 2's direction, which
+ * is where the soft endstop is. At the cap the centre runs exactly along the
+ * block's edges, which is also where the laser boundary trace then sits: the
+ * controller traces the tool centre, not the edge of the cut (MILLING.md's
+ * 2026-09-19 trace went to X1.587 Y158.412 for a 120 x 160 job).
  *
  * PATTERNS
  *
  * Four, for finding out how this machine faces best. They differ in which axis
  * does the cutting and whether every pass is climb:
  *
- *   serpentine-x  the original. Cuts along X, steps into -Y, alternates climb
+ *   serpentine-x  the original, and the default until 0.9.0. Cuts along X, steps into -Y, alternates climb
  *                 (+X) and conventional (-X).
- *   serpentine-y  the same, rotated: cuts along Y, which is the stiffer axis on
- *                 a gantry machine, steps into +X, alternates again.
+ *   serpentine-y  the default. The same, rotated: cuts along Y, which is the
+ *                 stiffer axis on a gantry machine, steps into +X, alternates.
  *   oneway-y      cuts along Y, always travelling +Y with the uncut material on
  *                 the right -- climb on every pass. Lifts, rapids back to the
  *                 front edge and plunges again between passes.
@@ -51,13 +62,13 @@
  * rotated 90 degrees and steps about half as far. The rotation is the point: a
  * finishing pass running the same way as the roughing pass rides in its grooves,
  * while one running across them cuts them off. Finish mode is serpentine-x
- * roughing and a serpentine-y finish, always; the pattern choice is general-mode
- * only until the coupons say which pattern a finishing pass should use.
+ * roughing and a serpentine-y finish, always, which the coupons confirmed: the
+ * finishing pass is the one on the good axis. The pattern is general-mode only.
  */
 
 import type { Recipe } from "./materials.ts";
 
-/** Which axis the raster lines run along. `x` is the default sweep. */
+/** Which axis the raster lines run along. */
 export type Axis = "x" | "y";
 
 export type Mode = "general" | "finish";
@@ -66,7 +77,19 @@ export type Pattern = "serpentine-x" | "serpentine-y" | "oneway-y" | "spiral";
 
 export const PATTERNS: readonly Pattern[] = ["serpentine-x", "serpentine-y", "oneway-y", "spiral"];
 
-export const DEFAULT_PATTERN: Pattern = "serpentine-x";
+/**
+ * General mode's default. Serpentine Y since 0.9.0: the coupons showed Y is the
+ * better axis on this machine, and that a serpentine's conventional passes
+ * change how the floor looks, not how flat it is (README, "Results so far").
+ */
+export const DEFAULT_PATTERN: Pattern = "serpentine-y";
+
+/**
+ * Finish mode's roughing pattern, fixed. It is NOT the general default: the
+ * finishing pass is rotated 90 degrees from the roughing, and it has to be the
+ * one on the good axis, so the roughing runs along X.
+ */
+export const FINISH_ROUGH_PATTERN: Pattern = "serpentine-x";
 
 export function isPattern(v: unknown): v is Pattern {
   return typeof v === "string" && (PATTERNS as readonly string[]).includes(v);
@@ -75,10 +98,16 @@ export function isPattern(v: unknown): v is Pattern {
 export interface Pt { readonly x: number; readonly y: number }
 
 export interface FacingSpec {
-  /** Faced area in X, mm. The swept area, not the tool path. */
+  /** The block in X, mm. The swept area without overhang, not the tool path. */
   readonly width: number;
-  /** Faced area in Y, mm. */
+  /** The block in Y, mm. */
   readonly height: number;
+  /**
+   * How far the cutter runs past each edge of the block, mm, 0..r. Omitted
+   * means 0. The form only offers 0 or r (a checkbox); the planner takes any
+   * value in between, and clamps above r.
+   */
+  readonly overhang?: number;
   /** Total depth to remove, mm. Split across passes by the tool's max DOC. */
   readonly depth: number;
   /** The resolved material + tool: feeds, DOC and the tool itself. */
@@ -86,7 +115,7 @@ export interface FacingSpec {
   /** Fraction of tool diameter. Defaults to the profile's value at the call site. */
   readonly stepover: number;
   readonly mode: Mode;
-  /** General mode only. Omitted means serpentine-x. */
+  /** General mode only. Omitted means DEFAULT_PATTERN. */
   readonly pattern?: Pattern;
 }
 
@@ -131,6 +160,13 @@ export interface FacingPath {
   readonly pattern: Pattern;
   /** Tool radius, mm. */
   readonly r: number;
+  /** How far the cutter runs past each edge of the block, mm. */
+  readonly overhang: number;
+  /**
+   * How far inside the block the tool centre runs, mm: r - overhang. It is
+   * also how far inside the block the laser boundary trace will sit.
+   */
+  readonly inset: number;
   /** Lateral step between raster lines, mm. */
   readonly step: number;
   readonly xLo: number;
@@ -245,7 +281,8 @@ function spiralStroke(w: number, h: number, r: number, step: number): { pts: Pt[
 interface Frame {
   readonly w: number;
   readonly h: number;
-  readonly r: number;
+  /** Tool centre's distance in from each edge of the block: r - overhang. */
+  readonly inset: number;
   readonly step: number;
 }
 
@@ -255,7 +292,7 @@ interface Frame {
  * ones came and so need no repositioning move to step down.
  */
 function planLevel(f: Frame, pattern: Pattern, z: number, flip: boolean, startsForward: boolean): Level {
-  const { w, h, r, step } = f;
+  const { w, h, inset: r, step } = f;
   if (pattern === "spiral") {
     const { pts, rings } = spiralStroke(w, h, r, step);
     return { z, pattern, strokes: [pts], passes: rings, raster: null, isFinish: false };
@@ -294,9 +331,13 @@ export function planFacing(spec: FacingSpec): FacingPath {
   const d = spec.material.tool.diameter;
   const r = d / 2;
   const step = d * spec.stepover;
-  const frame: Frame = { w: spec.width, h: spec.height, r, step };
+  const overhang = Math.min(spec.overhang ?? 0, r);
+  // Where the tool centre runs, measured in from each edge of the block: r
+  // with no overhang, 0 at the cap.
+  const inset = r - overhang;
+  const frame: Frame = { w: spec.width, h: spec.height, inset, step };
   // Finish mode's strategy is fixed; the pattern is a general-mode choice.
-  const pattern = spec.mode === "finish" ? DEFAULT_PATTERN : spec.pattern ?? DEFAULT_PATTERN;
+  const pattern = spec.mode === "finish" ? FINISH_ROUGH_PATTERN : spec.pattern ?? DEFAULT_PATTERN;
 
   const allowance = spec.mode === "finish" ? spec.material.finishAllowance : 0;
   const roughDepth = spec.depth - allowance;
@@ -334,8 +375,10 @@ export function planFacing(spec: FacingSpec): FacingPath {
     pattern,
     r,
     step,
-    xLo: r,
-    xHi: spec.width - r,
+    overhang,
+    inset,
+    xLo: inset,
+    xHi: spec.width - inset,
     levels,
     passesPerLevel: planLevel(frame, pattern, 0, false, true).passes,
     totalPasses: levels.reduce((n, l) => n + l.passes, 0),

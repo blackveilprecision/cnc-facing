@@ -68,6 +68,51 @@ export interface ToolProfile {
   readonly note: string;
 }
 
+/**
+ * The chamfer pass: a lap round the block's top edge with the 90° chamfering
+ * bit, after the facing, in the same file. Makera's published row for
+ * `0.1mm*90° Chamfering` (TOOLING.md, "Chamfering"), per material.
+ */
+export interface ChamferProfile {
+  readonly tool: ChamferTool;
+  readonly rpm: number;
+  readonly feed: number;
+  readonly plunge: number;
+  /** Depth per lap, mm: Makera's DOC column for the chamfer bit. */
+  readonly maxDepthPerPass: number;
+  readonly source: string;
+}
+
+export interface ChamferTool extends Tool {
+  /** Diameter of the flat at the tip, mm. */
+  readonly tipDiameter: number;
+  /** Half the included angle, degrees: 45 for a 90° bit. */
+  readonly halfAngle: number;
+}
+
+/**
+ * Five on the shelf (TOOLING.md, "The actual inventory"). `type=Engraving`
+ * because that is the V-bit type word the controller has accepted in every PCB
+ * header here, with halfAngle carrying the geometry. The cone runs from the
+ * 0.1mm tip to the 3.175 shank at 45°, about 1.5mm tall.
+ */
+export const CHAMFER_90: ChamferTool = {
+  name: "3.175*0.1mm*90deg Chamfer",
+  type: "Engraving",
+  diameter: 3.175,
+  handleDiameter: 3.175,
+  fluteLength: 1.5,
+  tipDiameter: 0.1,
+  halfAngle: 45,
+};
+
+const CHAMFER_SOURCE = "TOOLING.md, Chamfering, `0.1mm*90° Chamfering`";
+
+/** Chamfer width offered by default, mm: takes the sharp edge off, no more. */
+export const DEFAULT_CHAMFER = 0.2;
+/** Largest chamfer offered, mm. Past this it is a feature, not an edge break. */
+export const MAX_CHAMFER = 1.0;
+
 export type ToolId = "3.175";
 export type MaterialId = "mdf" | "aluminium" | "brass";
 
@@ -87,6 +132,12 @@ export interface Material {
    * tool's depth per pass, which validate.ts checks.
    */
   readonly finishAllowance: number;
+  /**
+   * What the depth field is set to when this material is picked, mm: one
+   * facing pass at Makera's depth of cut, 0.3 for MDF as it always was.
+   */
+  readonly defaultDepth: number;
+  readonly chamfer: ChamferProfile;
 }
 
 /** `;@MKR|MAXFEEDRATE|value=` -- declared in the header AND enforced in validate.ts. */
@@ -125,6 +176,8 @@ export const MATERIALS: Record<MaterialId, Material> = {
     label: "MDF",
     stockName: "MDF spoilboard",
     finishAllowance: 0.2,
+    defaultDepth: 0.3,
+    chamfer: { tool: CHAMFER_90, rpm: 12000, feed: 1000, plunge: 500, maxDepthPerPass: 1, source: `${CHAMFER_SOURCE}, Hardwood column` },
     tools: [
       {
         id: "3.175",
@@ -149,6 +202,8 @@ export const MATERIALS: Record<MaterialId, Material> = {
     label: "Aluminium",
     stockName: "Aluminium",
     finishAllowance: 0.05,
+    defaultDepth: 0.2,
+    chamfer: { tool: CHAMFER_90, rpm: 12000, feed: 600, plunge: 200, maxDepthPerPass: 0.2, source: `${CHAMFER_SOURCE}, Aluminum column` },
     tools: [
       {
         id: "3.175",
@@ -171,6 +226,8 @@ export const MATERIALS: Record<MaterialId, Material> = {
     label: "Brass",
     stockName: "Brass",
     finishAllowance: 0.05,
+    defaultDepth: 0.1,
+    chamfer: { tool: CHAMFER_90, rpm: 12000, feed: 500, plunge: 200, maxDepthPerPass: 0.1, source: `${CHAMFER_SOURCE}, Brass column` },
     tools: [
       {
         id: "3.175",
@@ -203,6 +260,8 @@ export interface Recipe extends ToolProfile {
   readonly label: string;
   readonly stockName: string;
   readonly finishAllowance: number;
+  readonly defaultDepth: number;
+  readonly chamfer: ChamferProfile;
 }
 
 /** Resolve a material id and optional tool id. Unknown tool -> the default. */
@@ -216,6 +275,8 @@ export function resolve(materialId: MaterialId, toolId?: string): Recipe | null 
     label: m.label,
     stockName: m.stockName,
     finishAllowance: m.finishAllowance,
+    defaultDepth: m.defaultDepth,
+    chamfer: m.chamfer,
   };
 }
 

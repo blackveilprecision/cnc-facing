@@ -21,6 +21,7 @@
  * which is what an order-sensitive parser would reject outright.
  */
 
+import type { ChamferPlan } from "./chamfer.ts";
 import type { FacingPath } from "./facing.ts";
 import { MAX_FEEDRATE } from "./materials.ts";
 
@@ -70,6 +71,11 @@ export function mkrHeader(opts: {
   stock: StockDeclaration;
   camVersion: string;
   toolpathName: string;
+  /**
+   * The chamfer as T2, when there is one. Two TOOL lines, then TIME, then two
+   * TOOLPATH lines: the order the multi-tool PCB headers here have run with.
+   */
+  chamfer?: ChamferPlan | null;
 }): string[] {
   const { path, stock } = opts;
   const { material } = path.spec;
@@ -95,11 +101,22 @@ export function mkrHeader(opts: {
       `|sticklength=0|handlediameter=${g(tool.handleDiameter)}` +
       `|flutelength=${g(tool.fluteLength)}|diameter=${g(tool.diameter)}` +
       `|tipdiameter=${g(tool.diameter)}|cornerradius=0|angle=0|halfAngle=0`,
-    `;@MKR|TIME|seconds=${path.seconds.toFixed(2)}`,
+    ...(opts.chamfer ? [chamferToolLine(opts.chamfer)] : []),
+    `;@MKR|TIME|seconds=${(path.seconds + (opts.chamfer?.seconds ?? 0)).toFixed(2)}`,
     `;@MKR|TOOLPATH|number=1|tool_number=1|name=[T1]${opts.toolpathName}`,
+    ...(opts.chamfer ? [`;@MKR|TOOLPATH|number=2|tool_number=2|name=[T2]Chamfer ${g(opts.chamfer.width)}mm`] : []),
     ";@MKR|END",
     "",
   ];
+}
+
+/** T2's line, in the V-bit form the PCB headers use: tip, and the half angle. */
+function chamferToolLine(c: ChamferPlan): string {
+  const t = c.profile.tool;
+  return `;@MKR|TOOL|number=2|id=|name=${t.name} - CHAMFER|type=${t.type}` +
+    `|sticklength=0|handlediameter=${g(t.handleDiameter)}` +
+    `|flutelength=${g(t.fluteLength)}|diameter=${g(t.diameter)}` +
+    `|tipdiameter=${g(t.tipDiameter)}|cornerradius=0|angle=0|halfAngle=${g(t.halfAngle)}`;
 }
 
 /** The tag of a `;@MKR|X|...` line, or null if the line is not one. */

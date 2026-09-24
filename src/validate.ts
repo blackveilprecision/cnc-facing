@@ -9,7 +9,10 @@
  */
 
 import { isPattern, type Mode, type Pattern } from "./facing.ts";
-import { MAX_FEEDRATE, resolve, type MaterialId, type ToolId } from "./materials.ts";
+import { MAX_CHAMFER, MAX_FEEDRATE, resolve, type MaterialId, type ToolId } from "./materials.ts";
+
+/** Smallest chamfer, mm: twice the chamfer bit's 0.05mm tip radius. */
+export const MIN_CHAMFER = 0.1;
 
 /**
  * The Z1's XY travel, mm.
@@ -34,18 +37,31 @@ import { MAX_FEEDRATE, resolve, type MaterialId, type ToolId } from "./materials
  * does not have to go looking, which PLAN.md had to.
  */
 export const ENVELOPE_X = 200;
+
 export const ENVELOPE_Y = 200;
 
 export interface JobRequest {
+  /** The block, as measured, mm. */
   width: number;
   height: number;
+  /**
+   * Run the cutter a tool radius past every edge of the block, so the whole
+   * top comes out clean with square corners. Off (the default) faces exactly
+   * the rectangle given, for surfacing part of a larger area.
+   */
+  overhang?: boolean;
+  /**
+   * Chamfer width on the top face, mm, cut with the 90° chamfer bit as T2
+   * after the facing. Omitted means none. Needs the overhang.
+   */
+  chamfer?: number;
   depth: number;
   material: MaterialId;
   /** Which bit. Omitted means the material's default. */
   tool?: ToolId;
   /** `general` (the default) or `finish`. */
   mode?: Mode;
-  /** General mode only. Omitted means serpentine-x. */
+  /** General mode only. Omitted means DEFAULT_PATTERN. */
   pattern?: Pattern;
   stepover: number;
 }
@@ -114,6 +130,22 @@ export function validate(req: JobRequest): Refusal[] {
       field: "height",
       message: `Size Y ${req.height}mm is beyond the Z1's ${ENVELOPE_Y}mm Y travel.`,
     });
+  }
+
+  if (req.overhang !== undefined && typeof req.overhang !== "boolean") {
+    out.push({ field: "overhang", message: `Overhang is on or off (got ${String(req.overhang)}).` });
+  }
+
+  if (req.chamfer !== undefined) {
+    if (!Number.isFinite(req.chamfer)) {
+      out.push({ field: "chamfer", message: `Chamfer is not a number.` });
+    } else if (req.chamfer < MIN_CHAMFER || req.chamfer > MAX_CHAMFER) {
+      out.push({ field: "chamfer", message: `Chamfer ${req.chamfer}mm: use ${MIN_CHAMFER} to ${MAX_CHAMFER}mm.` });
+    } else if (!req.overhang) {
+      // Without the overhang there is no block edge in the job, only a
+      // rectangle inside a larger surface.
+      out.push({ field: "chamfer", message: "Chamfer needs Overhang: it runs round the block's edge." });
+    }
   }
 
   if (req.depth > tool.fluteLength) {

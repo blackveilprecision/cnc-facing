@@ -137,7 +137,7 @@ describe.each(PATTERNS.map((p) => [p]))("%s", (pattern: Pattern) => {
     expect(zs.map((z) => Number(z.toFixed(3)))).toEqual([-0.2, -0.4, -0.6]);
   });
 
-  test("puts the pattern in the filename unless it is the default", () => {
+  test("puts the pattern in the filename unless it is the original serpentine-x", () => {
     const name = build({ pattern }).filename;
     if (pattern === "serpentine-x") expect(name).toBe("facing-aluminium-40x30-0.2mm-20260922.nc");
     else expect(name).toBe(`facing-aluminium-40x30-0.2mm-${pattern}-20260922.nc`);
@@ -248,10 +248,10 @@ describe("what the summary says about direction", () => {
   test("each pattern gets its own climb/conventional note", () => {
     const note = (pattern: Pattern) =>
       build({ pattern }).summary.warnings.find((w) => /climb/i.test(w.text))!.text;
-    expect(note("serpentine-x")).toContain("alternates");
-    expect(note("serpentine-y")).toContain("stiffer axis");
-    expect(note("oneway-y")).toContain("Every pass is climb");
-    expect(note("spiral")).toContain("four directions");
+    expect(note("serpentine-x")).toContain("Alternates: +X passes climb");
+    expect(note("serpentine-y")).toContain("Alternates: +Y passes climb");
+    expect(note("oneway-y")).toContain("Every pass climb");
+    expect(note("spiral")).toContain("Climb throughout");
   });
 });
 

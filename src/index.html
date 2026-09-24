@@ -50,10 +50,22 @@
     background: var(--bg); color: var(--ink);
     border: 1px solid var(--line); border-radius: 6px;
   }
-  input:focus-visible, button:focus-visible, .seg label:focus-within {
+  /* :has(:focus-visible), not :focus-within: a mouse click focuses the hidden
+     radio too, and :focus-within then outlines the button until you click
+     elsewhere. Keyboard focus still gets the ring. */
+  input:focus-visible, button:focus-visible, .seg label:has(input:focus-visible) {
     outline: 2px solid var(--accent); outline-offset: 1px;
   }
   input.bad { border-color: var(--bad); }
+  label.check { display: flex; align-items: center; gap: .5rem; cursor: pointer; }
+  label.check > span { display: inline; margin: 0; font-size: .9rem; color: var(--ink); }
+  label.check input { width: 1.05rem; height: 1.05rem; margin: 0; accent-color: var(--accent); }
+  .chamferrow { display: flex; align-items: center; gap: 1rem; margin-bottom: .85rem; }
+  .chamferrow label { margin: 0; }
+  label.inline { display: flex; align-items: center; gap: .35rem; }
+  label.inline input { width: 5.5rem; }
+  label.inline > span { display: inline; margin: 0; }
+  .chamferrow:has(input:disabled) { opacity: .5; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
   .seg { display: flex; gap: .4rem; margin-bottom: .85rem; }
   .seg label { flex: 1; margin: 0; }
@@ -182,10 +194,24 @@
   <form id="f" autocomplete="off">
     <div class="panel">
       <h2>The job</h2>
+      <span style="display:block;font-size:.8rem;color:var(--dim);margin-bottom:.25rem">Material</span>
+      <div class="seg" id="mats"></div>
+      <span id="toollabel" style="display:block;font-size:.8rem;color:var(--dim);margin-bottom:.25rem">Bit in the collet</span>
+      <div class="seg" id="tools"></div>
+      <div id="onlytool" class="onlytool" hidden></div>
+      <p class="cite" id="toolnote" style="margin-top:-.4rem"></p>
       <div class="row">
         <label><span>Size X (mm)</span><input type="number" name="width" value="80" min="0" step="0.1" required></label>
         <label><span>Size Y (mm)</span><input type="number" name="height" value="60" min="0" step="0.1" required></label>
       </div>
+      <p class="cite" style="margin-top:-.4rem">The block as measured. X0 Y0 on its back-left corner.</p>
+      <label class="check"><input type="checkbox" name="overhang"> <span>Overhang — face the whole block</span></label>
+      <p class="cite" id="overhangnote" style="margin-top:-.4rem"></p>
+      <div class="chamferrow">
+        <label class="check"><input type="checkbox" name="chamferOn"> <span>Chamfer edges</span></label>
+        <label class="inline"><input type="number" name="chamfer" value="0.2" min="0.1" max="1" step="0.05"> <span>mm</span></label>
+      </div>
+      <p class="cite" id="chamfernote" style="margin-top:-.4rem"></p>
       <span style="display:block;font-size:.8rem;color:var(--dim);margin-bottom:.25rem">Job</span>
       <div class="seg" id="modes">
         <label><input type="radio" name="mode" value="general" checked><span>General</span></label>
@@ -198,19 +224,12 @@
         <p class="cite" id="patternnote" style="margin-top:-.4rem"></p>
       </div>
       <label><span>Depth (mm)</span><input type="number" name="depth" value="0.3" min="0" step="0.05" required></label>
-      <span style="display:block;font-size:.8rem;color:var(--dim);margin-bottom:.25rem">Material</span>
-      <div class="seg" id="mats"></div>
-      <span id="toollabel" style="display:block;font-size:.8rem;color:var(--dim);margin-bottom:.25rem">Bit in the collet</span>
-      <div class="seg" id="tools"></div>
-      <div id="onlytool" class="onlytool" hidden></div>
-      <p class="cite" id="toolnote" style="margin-top:-.4rem"></p>
       <details>
         <summary>Advanced</summary>
         <div>
           <label><span>Stepover (fraction of tool diameter)</span>
             <input type="number" name="stepover" value="0.45" min="0.05" max="1" step="0.05" required></label>
-          <p class="cite">0.45 is what every faced board on this machine was cut with — conservative
-          for MDF's ragged fibres. Changing it is a machining decision, not a preference.</p>
+          <p class="cite">0.45 is what every job here has used.</p>
         </div>
       </details>
     </div>
@@ -245,11 +264,7 @@
 
     <div class="panel" id="reach-panel">
       <h2>Reach check — paste into MDI</h2>
-      <p class="cite" style="margin-top:0">
-        Walks the four corners of the stock, which is what the laser boundary trace
-        will follow. Jogging there is 10&nbsp;mm a press with a wait between; these are
-        one move each. Click a line to copy it.
-      </p>
+      <p class="cite" style="margin-top:0">The block's corners. If these reach, the job does. Click a line to copy.</p>
       <table class="mdi"><tbody id="mdi"></tbody></table>
       <button type="button" class="copyall" id="copyall">Copy all seven lines</button>
     </div>
@@ -349,19 +364,42 @@ function renderTools(keep) {
 }
 
 const MODE_NOTE = {
-  general: "One pass of the chosen pattern per depth level. For a spoilboard or fixture plate you tape stock to — flat matters, shiny does not.",
-  finish: "Roughs to within an allowance, then takes it off in one pass at 90° with about half the stepover. For soft metals where the surface is the point.",
+  general: () => "One pass of the pattern per depth level. Flat, fast.",
+  finish: () => {
+    const a = MATS[form.material.value].finishAllowance;
+    return `Depth is the total. Roughs along X to ${a} mm short, then one pass along Y takes the last ${a} mm at half the step. Best surface.`;
+  },
 };
 
+/**
+ * The overhang, explained with the bit actually in the collet: its radius is
+ * both the cap and how far inside the block the laser trace sits at zero.
+ */
+function syncOverhang() {
+  const t = currentTool();
+  if (!t) return;
+  const r = (t.diameter / 2).toFixed(2);
+  // The chamfer runs round the block's edge, so it needs the overhang.
+  const whole = form.overhang.checked;
+  form.chamferOn.disabled = !whole;
+  form.chamfer.disabled = !whole || !form.chamferOn.checked;
+  $("chamfernote").textContent = !whole
+    ? "Needs Overhang."
+    : form.chamferOn.checked ? "After facing, stops for T2: the 90° chamfer bit." : "";
+  $("overhangnote").textContent = form.overhang.checked
+    ? `Cutter runs ${r} mm past every edge: clean edges, square corners. Laser traces the block outline.`
+    : `Faces only this rectangle. Laser box sits ${r} mm inside it; that is correct.`;
+}
+
 const PATTERN_NOTE = {
-  "serpentine-x": "The original: cuts along X, alternating climb and conventional.",
-  "serpentine-y": "Cuts along Y, the stiffer axis, still alternating climb and conventional.",
-  "oneway-y": "Cuts along Y, front to back, climb on every pass; lifts and returns between passes.",
-  spiral: "Clockwise rings inward, climb throughout. One coupon shows the X-cut and Y-cut surfaces side by side.",
+  "serpentine-x": "Along X, back and forth.",
+  "serpentine-y": "Along Y, the stiffer axis, back and forth. The default.",
+  "oneway-y": "Along Y, climb only. Lifts between passes; slower.",
+  spiral: "Rings inward, climb. Shows X- and Y-cut surfaces side by side.",
 };
 
 function syncMode() {
-  $("modenote").textContent = MODE_NOTE[form.mode.value];
+  $("modenote").textContent = MODE_NOTE[form.mode.value]();
   // Fine finish is a fixed strategy (rough along X, finish along Y), so the
   // pattern only applies to general mode.
   $("patternrow").hidden = form.mode.value === "finish";
@@ -382,17 +420,22 @@ function syncStepover() {
   if (!t) return;
   form.stepover.value = t.stepover;
   $("toolnote").innerHTML = t.derived
-    ? `<span class="derived">Derived feeds</span> — Makera sells this bit but publishes no speeds and feeds for it. Start shallow.`
-    : "Makera's published figures for this bit and material.";
+    ? `<span class="derived">Derived feeds</span>: none published. Start shallow.`
+    : "Makera's published figures.";
 }
 
 renderTools();
+form.depth.value = MATS[form.material.value].defaultDepth;
 syncStepover();
+syncOverhang();
 syncMode();
 
 function body() {
   const b = Object.fromEntries(new FormData(form));
   if (b.mode === "finish") delete b.pattern;
+  // Disabled or unticked, the width is not sent; the tick box never is.
+  if (!b.chamferOn) delete b.chamfer;
+  delete b.chamferOn;
   return b;
 }
 
@@ -406,10 +449,9 @@ function renderOk(d) {
   const s = d.summary;
   $("svg").innerHTML = d.svg;
   $("cap").textContent =
-    `Swept X 0 → ${s.sweptArea.x[1]}, Y ${s.sweptArea.y[0]} → 0. ` +
-    `The crosshair is X0 Y0; Y runs toward you. ` +
-    (s.finish ? "Shown: the finishing pass, which is the surface you get."
-              : "Shown: one depth level; the rest repeat it. The dot is where the tool goes down.");
+    `Swept X ${+s.sweptArea.x[0].toFixed(2)} → ${+s.sweptArea.x[1].toFixed(2)}, Y ${+s.sweptArea.y[0].toFixed(2)} → ${+s.sweptArea.y[1].toFixed(2)}. ` +
+    "Crosshair X0 Y0, dot where the tool goes down. " +
+    (s.finish ? "Shown: the finishing pass." : "Shown: one level.");
   $("spec").innerHTML = [
     ["Pattern", s.finish ? "Serpentine X, then a finishing pass along Y" : s.patternLabel],
     ["Tool", s.tool + (s.derived ? ' <span class="derived">derived feeds</span>' : "")],
@@ -420,15 +462,24 @@ function renderOk(d) {
     ["Passes", s.finish
       ? `${s.levels - 1} × ${s.passesPerLevel} roughing + ${s.finish.passes} finishing = ${s.totalPasses}`
       : `${s.levels} × ${s.passesPerLevel} ${s.passUnit} = ${s.totalPasses}`],
-    ["Pass depths", s.passDepths.map((v) => v.toFixed(3)).join(", ") + " mm"],
+    // Cumulative, from the stock top: "0.150, 0.200" read at the machine as a
+    // 0.2mm finishing cut when it takes only the last 0.05. Say so.
+    ["Down to", s.passDepths.map((v) => v.toFixed(3)).join(" → ") +
+      " mm <small>(below the top, after each level)</small>"],
     ...(s.finish ? [["Finishing pass",
-      `${s.finish.allowance} mm at ${s.finish.stepoverMm.toFixed(2)} mm step` +
-      (s.finish.rotated ? ", rotated 90°" : "")]] : []),
+      `takes the last ${s.finish.allowance} mm ` +
+      `<small>(${(s.passDepths.at(-1) - s.finish.allowance).toFixed(3)} → ${s.passDepths.at(-1).toFixed(3)})</small>, ` +
+      `${s.finish.rotated ? "along Y, " : ""}${s.finish.stepoverMm.toFixed(2)} mm step`]] : []),
+    ...(s.chamfer ? [["Chamfer",
+      `${s.chamfer.width} mm, T2 ${s.chamfer.tool} <small>(${s.chamfer.laps} lap${s.chamfer.laps > 1 ? "s" : ""} at ${s.chamfer.feed} mm/min, ${s.chamfer.rpm} rpm)</small>`]] : []),
     ["Cutting length", `${Math.round(s.cutLengthMm)} mm`],
     ["Estimated time", `<strong>${duration(s.minutes)}</strong>`],
     ["Declared stock", `${s.stock.length} × ${s.stock.width} × ${s.stock.height} mm`],
+    ["Laser box", s.laserInset > 1e-9
+      ? `${s.laserInset.toFixed(2)} mm inside the block <small>(the tool centre)</small>`
+      : "on the block's outline <small>(the tool centre)</small>"],
   ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
-  $("cite").innerHTML = `Source: ${s.source}.<br>${s.materialNote}`;
+  $("cite").textContent = `Source: ${s.source}.`;
   $("notes").innerHTML = s.warnings
     .map((w) => `<li class="${w.level === "warn" ? "warn" : ""}">${w.text}</li>`).join("");
   $("mdi").innerHTML = d.reach.map((s) =>
@@ -485,9 +536,14 @@ async function plan() {
 }
 
 form.addEventListener("input", (e) => {
-  if (e.target.name === "material") { renderTools(form.tool?.value); syncStepover(); }
-  else if (e.target.name === "tool") syncStepover();
+  if (e.target.name === "material") {
+    renderTools(form.tool?.value); syncStepover(); syncOverhang(); syncMode();
+    // One facing pass at Makera's depth of cut for the new material.
+    form.depth.value = MATS[form.material.value].defaultDepth;
+  }
+  else if (e.target.name === "tool") { syncStepover(); syncOverhang(); }
   else if (e.target.name === "mode" || e.target.name === "pattern") syncMode();
+  else if (e.target.name === "overhang" || e.target.name === "chamferOn") syncOverhang();
   plan();
 });
 form.addEventListener("submit", async (e) => {
@@ -605,8 +661,8 @@ function renderCheck(d) {
   $("c-svg").innerHTML = d.svg;
   $("c-reach-panel").hidden = d.reach.length === 0;
   $("c-reach-note").textContent = h.stock
-    ? "Walks the declared stock's corners, which is what the laser boundary trace should follow. Click a line to copy it."
-    : "No stock declared, so this walks the material the file removes, tool radius included. Click a line to copy it.";
+    ? "The declared stock's corners. Click a line to copy."
+    : "No stock declared: the area the file cuts. Click a line to copy.";
   $("c-mdi").innerHTML = d.reach.map((r) =>
     `<tr class="${r.critical ? "crit" : ""}"><td><code class="copy" tabindex="0">${esc(r.code)}</code></td>` +
     `<td class="why">${esc(r.why)}</td></tr>`).join("");

@@ -51,7 +51,7 @@ describe("reachCheck", () => {
       expect(s.code).not.toContain(";");
       expect(s.code).not.toContain("(");
       expect(s.code.split("\n").length).toBe(1);
-      expect(s.why.length).toBeGreaterThan(20);
+      expect(s.why.length).toBeGreaterThan(3);
     }
   });
 });

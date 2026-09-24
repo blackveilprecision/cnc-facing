@@ -9,8 +9,12 @@ import { gcodeBody, planFacing, splitDepth } from "../src/facing.ts";
 import { MATERIALS, DEFAULT_STEPOVER, resolve, type MaterialId } from "../src/materials.ts";
 import { buildJob } from "../src/gcode.ts";
 
+// Pinned to serpentine-x, the ported pattern these tests were written against.
+// The default moved to serpentine-y in 0.9.0; patterns.test.ts checks the same
+// properties for every pattern.
 const plan = (w: number, h: number, d: number, m: MaterialId = "mdf", tool?: "3.175" | "6") =>
   planFacing({
+    pattern: "serpentine-x",
     width: w, height: h, depth: d,
     material: resolve(m, tool)!,
     stepover: resolve(m, tool)!.stepover,
@@ -18,7 +22,7 @@ const plan = (w: number, h: number, d: number, m: MaterialId = "mdf", tool?: "3.
   });
 
 function allLines(w: number, h: number, d: number, m: MaterialId = "mdf") {
-  const r = buildJob({ width: w, height: h, depth: d, material: m, stepover: DEFAULT_STEPOVER }, { thumbnail: false });
+  const r = buildJob({ width: w, height: h, depth: d, material: m, stepover: DEFAULT_STEPOVER, pattern: "serpentine-x" }, { thumbnail: false });
   if (!r.ok) throw new Error(JSON.stringify(r.refusals));
   return r.lines;
 }

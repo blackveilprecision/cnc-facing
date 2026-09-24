@@ -193,6 +193,18 @@ describe("one thing broken", () => {
     expect(serious(r)).toEqual([]);
   });
 
+  test("a cut one tool radius past the stock is an overhang: a note, not a warning", () => {
+    // Our own Overhang job: the 3.175 bit's centre on the block's outline.
+    const built = buildJob(
+      { width: 45, height: 45, depth: 0.2, material: "aluminium", stepover: 0.45, overhang: true, chamfer: 0.2, mode: "finish" },
+      { thumbnail: false },
+    );
+    if (!built.ok) throw new Error("build failed");
+    const r = checkGcode(built.gcode, "job.nc");
+    expect(r.findings.find((f) => f.code === "outside-stock")!.level).toBe("note");
+    expect(r.verdict).toBe("ok");
+  });
+
   test("a cut outside the declared stock warns", () => {
     const r = mutate((ls) => ls.map((l) => l.replace("|length=80|", "|length=60|").replace("|x=-40|", "|x=-30|")));
     expect(codes(r, "warn")).toContain("outside-stock");

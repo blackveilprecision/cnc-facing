@@ -56,6 +56,32 @@ are ported verbatim and each is commented at the line that implements it. The
 tests for the four that failed silently are in `test/mkr.test.ts`,
 `test/facing.test.ts` and `test/gcode.test.ts`.
 
+## Chamfer
+
+Tick **Chamfer edges** (it needs Overhang) and the file carries a second
+operation after the facing: it stops for **T2, the 90° chamfering bit**
+(`0.1mm*90° Chamfering`; five on the shelf), re-probes Z, and runs the block's
+top edge. The default width is 0.2mm, and 0.1–1mm is allowed.
+
+- **Path:** the tool centre runs the block's outline, clockwise from X0 Y0,
+  which is climb. It never goes behind or left of the origin. The corners come
+  out as mitres.
+- **Depth:** the tip goes (width − 0.05mm tip radius) below the faced top, in
+  laps no deeper than Makera's figure for the bit (0.2mm aluminium, 0.1mm
+  brass, 1mm MDF). Feeds are Makera's chamfer row per material.
+- **The tool change** is the same `G0 Z5` / `M5` / `T2 M6` sequence every
+  multi-bit PCB file here has run with. The header gets the second `TOOL` line
+  in the V-bit form those files use (`type=Engraving`, `halfAngle=45`).
+- **Accuracy:** an X0 Y0 error of 0.1mm makes one side's chamfer 0.1mm wider
+  than the opposite one, and a Z error changes the width by the same amount.
+- **Run on the machine 2026-09-24: perfect.** Aluminium, 45 × 45, fine finish
+  with overhang and a 0.2mm chamfer, from a 3D-probed corner. The `T2 M6`
+  stop, the Z re-probe and the two-tool header all worked as they do on the
+  PCB jobs.
+
+Picking a material also sets the depth to one facing pass at Makera's depth of
+cut: 0.3mm MDF, 0.2mm aluminium, 0.1mm brass.
+
 ## Preview and thumbnail
 
 Two separate mechanisms that fail independently — which is what made the
@@ -104,8 +130,57 @@ G0 X0 Y0
 
 They appear in the UI with a click-to-copy on each line, and as a comment block
 near the top of the `.nc` itself, so the file carries its own instructions for
-checking it. It walks the **stock** corners, not the toolpath extents — the
-larger box, and the one the laser boundary trace follows.
+checking it. It walks the **stock** corners, not the toolpath extents, because
+they are the larger box. It is **not** the box the laser boundary trace follows;
+see the next section.
+
+## The laser trace and the overhang
+
+**The controller's laser boundary trace follows the tool centre, not the edge
+of the cut.** With no overhang the tool centre runs a tool radius (1.59mm) in
+from every edge, so the laser box is 1.59mm inside the block on all four sides.
+**That is correct.** The cutter still reaches exactly to the edges. This README
+said the opposite until 0.9.0. The evidence was already there: the first 120 ×
+160 trace, in garasje's `MILLING.md`, went to `X1.587 Y158.412`, which is the
+tool centre, not the corner.
+
+It surfaced on 2026-09-23. A 45.2 × 45.2 block got a 45 × 45 job whose laser box
+sat visibly inside it, so the size was nudged up a millimetre at a time to 49 ×
+49 until the laser reached the edge. The cut then ran about 1.9mm past every
+edge. That is harmless in air, but it isn't the job that was asked for.
+
+**So: enter the block's measured size, and tick Overhang to face the whole
+block.** It is a checkbox, not a value:
+
+| Overhang | Tool centre runs | Laser box | Edges and corners | For |
+|---|---|---|---|---|
+| off (default) | r..W−r | r inside the block | burrs, small bites where passes end, r-radius corners | part of a larger surface |
+| on | 0..W, the block's outline | **on the block's outline** | clean, square corners | the whole block |
+
+With it off the cutter only just reaches the edge, and it didn't in practice
+(2026-09-24, a 45.26 × 45.0 block, 3D-probed corner): the left and back edges
+came out burred and not quite clean. An end mill cutting a few hundredths
+under nominal, runout and probe error are enough, because there is no margin.
+With it on there is a tool radius of margin all round.
+
+**The corners come out square with it on.** A round bit can't cut a square
+*inside* corner, but a block's corners are *outside* ones. With the tool centre
+passing over the corner point, the cutter covers it.
+
+**It isn't shifted.** X0 Y0 still goes on the block's back-left corner, where
+the 3D probe finds it. The cutter reaches the same distance past all four
+edges, and the tool centre never goes behind or left of X0 Y0. That direction
+is where the soft endstop is (see `PLAN.md`'s rule about Y running negative),
+and it is why the overhang is exactly a tool radius and no more. Any further
+would only cut air.
+
+`STOCK` in the header stays the block, so the controller's preview shows the
+cutter going past its edges. The filename gets `-overhang` so two jobs that
+differ only in overhang don't overwrite each other.
+
+**Run on the machine 2026-09-24:** the controller is fine with a toolpath past
+its declared stock. The laser traced the block's outline, and the edges and
+corners came out clean.
 
 The block also carries a relative-hop example for getting the head out of the
 way. It moves in Z and X only, on purpose: Y is the axis with no slack, and
@@ -209,7 +284,8 @@ result is the machine or the material.
 ## Two modes
 
 **General** is the original behaviour and the default: one pass of the chosen
-pattern (below) per depth level, serpentine along X unless told otherwise. It is
+pattern (below) per depth level, serpentine along Y unless told otherwise
+(along X before 0.9.0; the coupons below moved it). It is
 what a spoilboard or fixture plate wants — a flat reference to tape PCBs and stock
 to, where speed matters and the look does not.
 
@@ -288,8 +364,8 @@ shelf, before buying anything.
 
 | Pattern | Cuts along | Climb? | Between passes |
 |---|---|---|---|
-| **Serpentine X** (default) | X | alternates: +X climb, −X conventional | G1 stepover into −Y |
-| **Serpentine Y** | Y, the stiffer axis | alternates: +Y climb, −Y conventional | G1 stepover into +X |
+| **Serpentine X** (default before 0.9.0) | X | alternates: +X climb, −X conventional | G1 stepover into −Y |
+| **Serpentine Y** (default) | Y, the stiffer axis | alternates: +Y climb, −Y conventional | G1 stepover into +X |
 | **One-way Y** | Y, front to back | every pass | lift 1mm, rapid to the front edge, plunge |
 | **Spiral** | all four directions | every pass, clockwise inward | short diagonal G1 to the next ring |
 
@@ -357,17 +433,37 @@ pass it lies in the feed direction and the floor stays flat. That the two X side
 *differ* (the burrs are on one side only) points at a fixed tilt more than at
 flex.
 
+**2026-09-23, One-way Y, aluminium, 0.2mm, 45%, 100 × 100.** Very good. The
+stepover lines show plainly under light, but they cannot be felt with a
+fingertip and barely with a fingernail. So the lines are mostly optical — the
+light catching the pass boundaries and the end-face swirl inside each pass —
+rather than height. That fits the spiral: along Y the floor stays flat, and
+whatever small left-right tilt is left only shows up as a line at each overlap.
+
+**2026-09-23, Serpentine Y, aluminium, 0.2mm, 45%.** The alternation shows:
+every other band looks different, bright and fine-textured next to darker with
+coarser end-face scallops, which are the climb (+Y) and conventional (−Y)
+passes. It **feels the same as One-way Y**, though. So the conventional passes
+change how the surface looks, not how flat it is. For a spoilboard or fixture
+plate that is a pass, and Serpentine Y is as fast as the original.
+
+**2026-09-23, fine finish, aluminium.** It **feels the best of all of them**. The
+finishing pass leaves visibly finer, closer lines (about 0.7mm apart, against
+1.43mm) with the same scallop texture inside each one. No change needed: its
+finishing pass already runs along Y.
+
+**Where that leaves it:** along Y wins, conventional versus climb only changes
+how it looks, and fine finish is the one to use when the surface matters. So
+from 0.9.0 **Serpentine Y is the general-mode default**. Fine finish keeps
+roughing along X, so that its rotated finishing pass is the one on Y. A plain
+filename still means Serpentine X, as it did for every earlier job, and
+`-serpentine-y` is spelled out.
+
 **Still to cut:**
 
-1. **Serpentine Y against One-way Y**, 0.2mm, 45%. The spiral's Y sides were
-   both climb. This shows whether the conventional −Y passes of a serpentine are
-   also fine. If they are, Serpentine Y becomes the general-mode default (as fast
-   as the original, on the good axis).
-2. *Optional:* the spiral again at **0.1mm**. It halves the load but not the
+1. *Optional:* the spiral again at **0.1mm**. It halves the load but not the
    stepover, so if the X triangles clear up it is flex, and if they do not it is
    tram, which no feed or depth will fix.
-3. **Fine finish.** Its finishing pass already runs along Y, so it needs no
-   change to use the good axis.
 
 ### On a three-flute
 

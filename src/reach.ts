@@ -12,9 +12,14 @@
  * same thing in four moves.
  *
  * The corners traced are the STOCK corners (0..W, -H..0), not the toolpath
- * extents (r..W-r). Two reasons: they are the larger of the two, so a pass here
- * clears the toolpath as well; and they are what the controller's own laser
- * boundary trace walks, so this is a dry run of that.
+ * extents (r-o..W-(r-o)). They are the larger of the two -- the overhang is
+ * capped at the tool radius, so the tool centre never leaves the block -- and
+ * a walk that reaches them clears the toolpath as well.
+ *
+ * It is NOT what the controller's laser boundary trace walks. That was said
+ * here until 2026-09-23 and was wrong: the trace follows the tool centre, so it
+ * sits r-o inside the block. MILLING.md's first trace went to X1.587 Y158.412
+ * for a 120 x 160 job, and a 45mm job on a 45.2mm block traced visibly inside it.
  */
 
 import type { JobRequest } from "./validate.ts";
@@ -35,21 +40,14 @@ export function reachCheck(req: Pick<JobRequest, "width" | "height">): ReachStep
   return [
     {
       code: "G90 G21",
-      why: "Absolute, mm. Jogging can leave the controller in G91, and a relative move here would go somewhere you did not ask for.",
+      why: "Absolute mm (jogging can leave G91 set).",
     },
-    {
-      code: `G0 Z${g(SAFE_Z)}`,
-      why: `Lift to safe Z before any XY move. Assumes Z0 is already set on the stock top — do this after zeroing, not before.`,
-    },
-    { code: "G0 X0 Y0", why: "Back to the work origin, so the walk starts from a known corner." },
-    { code: `G0 X${x} Y0`, why: "Along the back edge, to the far end in X." },
-    {
-      code: `G0 X${x} Y${y}`,
-      why: "The far corner — furthest in X and furthest toward you in Y. This is the one that hits the soft endstop, and if it is reachable the rest is.",
-      critical: true,
-    },
-    { code: `G0 X0 Y${y}`, why: "Along the front edge, back to X0." },
-    { code: "G0 X0 Y0", why: "Home to the work origin, ready to start the job." },
+    { code: `G0 Z${g(SAFE_Z)}`, why: "Lift. After zeroing Z." },
+    { code: "G0 X0 Y0", why: "Origin." },
+    { code: `G0 X${x} Y0`, why: "Back right." },
+    { code: `G0 X${x} Y${y}`, why: "Front right: the one that hits the endstop.", critical: true },
+    { code: `G0 X0 Y${y}`, why: "Front left." },
+    { code: "G0 X0 Y0", why: "Origin, ready." },
   ];
 }
 
@@ -68,21 +66,18 @@ export function reachWalk(box: { x0: number; x1: number; y0: number; y1: number 
   return [
     {
       code: "G90 G21",
-      why: "Absolute, mm. Jogging can leave the controller in G91, and a relative move here would go somewhere you did not ask for.",
+      why: "Absolute mm (jogging can leave G91 set).",
     },
-    {
-      code: `G0 Z${g(SAFE_Z)}`,
-      why: "Lift before any XY move. Assumes Z0 is already set on the stock top, so do this after zeroing, not before.",
-    },
-    { code: corner(box.x0, yNear), why: "The near corner on the origin's side." },
-    { code: corner(box.x1, yNear), why: "Along the near edge, to the far end in X." },
+    { code: `G0 Z${g(SAFE_Z)}`, why: "Lift. After zeroing Z." },
+    { code: corner(box.x0, yNear), why: "Near corner, origin side." },
+    { code: corner(box.x1, yNear), why: "Near edge, far end." },
     {
       code: corner(box.x1, yFar),
-      why: `The far corner, furthest from the origin (${positive ? "away from you in Y" : "toward you in Y"}). This is the one that hits the soft endstop, and if it is reachable the rest is.`,
+      why: `Far corner (${positive ? "away from you" : "toward you"}): the one that hits the endstop.`,
       critical: true,
     },
-    { code: corner(box.x0, yFar), why: "Along the far edge, back in X." },
-    { code: "G0 X0 Y0", why: "Home to the work origin, ready to start the job." },
+    { code: corner(box.x0, yFar), why: "Far edge, back in X." },
+    { code: "G0 X0 Y0", why: "Origin, ready." },
   ];
 }
 

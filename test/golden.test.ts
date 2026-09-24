@@ -32,7 +32,8 @@ function motion(text: string): string[] {
 describe("golden: surface_spoilboard.py 80 x 60 x 0.3 MDF", () => {
   const reference = motion(readFileSync(FIXTURE, "latin1"));
   const built = buildJob(
-    { width: 80, height: 60, depth: 0.3, material: "mdf", stepover: 0.45 },
+    // The script only knows X; the app's default moved to serpentine-y in 0.9.0.
+    { width: 80, height: 60, depth: 0.3, material: "mdf", stepover: 0.45, pattern: "serpentine-x" },
     { thumbnail: false },
   );
   if (!built.ok) throw new Error(JSON.stringify(built.refusals));

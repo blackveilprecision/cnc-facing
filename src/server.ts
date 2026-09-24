@@ -62,6 +62,13 @@ function parseRequest(body: unknown): JobRequest {
   return {
     width: num(b.width),
     height: num(b.height),
+    // A checkbox: FormData sends "on" when ticked and nothing when not. JSON
+    // callers may send a boolean. Anything else is refused by validate().
+    overhang: b.overhang === undefined || b.overhang === false || b.overhang === ""
+      ? undefined
+      : b.overhang === true || b.overhang === "on" || b.overhang === "true" ? true : (b.overhang as never),
+    // Sent only when the chamfer box is ticked; blank means none.
+    chamfer: b.chamfer === undefined || b.chamfer === "" ? undefined : num(b.chamfer),
     depth: num(b.depth),
     material,
     tool,
@@ -194,6 +201,7 @@ const server = Bun.serve({
         id,
         label: MATERIALS[id].label,
         finishAllowance: MATERIALS[id].finishAllowance,
+        defaultDepth: MATERIALS[id].defaultDepth,
         tools: MATERIALS[id].tools.map((t) => ({
           id: t.id,
           // "3.175mm" -- what the form shows, and what goes in the collet.
@@ -204,6 +212,7 @@ const server = Bun.serve({
           plunge: t.plunge,
           maxDepthPerPass: t.maxDepthPerPass,
           fluteLength: t.tool.fluteLength,
+          diameter: t.tool.diameter,
           stepover: t.stepover,
           finishStepover: t.finishStepover,
           derived: t.derived,

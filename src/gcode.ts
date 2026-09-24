@@ -28,6 +28,7 @@
  */
 
 import pkg from "../package.json" with { type: "json" };
+import { chamferBody, planChamfer, type ChamferPlan } from "./chamfer.ts";
 import { DEFAULT_PATTERN, gcodeBody, planFacing, SAFE_Z, type FacingPath } from "./facing.ts";
 import { MATERIALS, resolve } from "./materials.ts";
 import { g, mkrHeader, type StockDeclaration } from "./mkr.ts";
@@ -63,6 +64,8 @@ export interface BuildOk {
   readonly gcode: string;
   readonly lines: string[];
   readonly path: FacingPath;
+  /** The T2 chamfer pass, or null. */
+  readonly chamfer: ChamferPlan | null;
   readonly scene: Scene;
   readonly svg: string;
   readonly summary: Summary;
@@ -93,18 +96,25 @@ export function buildJob(req: JobRequest, opts: BuildOptions = {}): BuildResult 
     stepover: req.stepover,
     mode: req.mode ?? "general",
     pattern: req.pattern,
+    // A tool radius when on: the tool centre then runs the block's outline.
+    overhang: req.overhang ? material.tool.diameter / 2 : 0,
   });
 
-  // The declared stock IS the faced area in X and Y. That is not a shortcut:
-  // the tool centre runs r..W-r, so the swept area is exactly 0..W by
-  // construction, and a STOCK box that equals it is the box the controller
-  // should draw the preview inside. Declaring anything else is how a job ends
-  // up outside its own preview.
+  // The declared stock is the block. With no overhang it is also exactly the
+  // swept area, because the tool centre runs r..W-r. With one, the swept area
+  // is the block plus the overhang on each side, and the preview shows the
+  // cutter going past the block's edges, which is what the machine will do.
+  // Declaring the swept area instead would make the preview box bigger than
+  // the block on the table and lie about what is being faced.
   const stock: StockDeclaration = {
     length: req.width,
     width: req.height,
     height: STOCK_HEIGHT,
   };
+
+  const chamfer = req.chamfer
+    ? planChamfer({ profile: material.chamfer, width: req.chamfer, w: req.width, h: req.height, faceDepth: req.depth })
+    : null;
 
   const now = opts.now ?? new Date();
   const scene = buildScene(path, stock);
@@ -116,10 +126,13 @@ export function buildJob(req: JobRequest, opts: BuildOptions = {}): BuildResult 
       stock,
       camVersion: VERSION,
       toolpathName: `Face ${g(req.width)}x${g(req.height)}`,
+      chamfer,
     }),
-    `(Facing ${g(req.width)} x ${g(req.height)} mm, ${g(req.depth)} mm deep, ${material.label})`,
+    `(Facing ${g(req.width)} x ${g(req.height)} mm, ${g(req.depth)} mm deep, ${material.label}` +
+      `${path.overhang > 0 ? `, overhang ${path.overhang.toFixed(2)} mm` : ""})`,
     `(${PATTERN_LABELS[path.pattern]}${path.mode === "finish" ? ", then a finishing pass along Y" : ""})`,
     `(${path.levels.length} pass${path.levels.length === 1 ? "" : "es"} at ${g(round(path.step, 3))} mm stepover, ~${(path.seconds / 60).toFixed(1)} min)`,
+    ...(chamfer ? [`(Then T2: ${g(chamfer.width)} mm chamfer round the top edge, 90deg chamfer bit)`] : []),
     `(Generated ${stamp(now)} by cnc-facing ${VERSION})`,
     "",
     ...reachCheckComment(req),
@@ -135,6 +148,7 @@ export function buildJob(req: JobRequest, opts: BuildOptions = {}): BuildResult 
     `S${material.rpm} M3`,
     "G4 P1",
     ...gcodeBody(path),
+    ...(chamfer ? chamferBody(chamfer) : []),
     `G0 Z${g(SAFE_Z)}`,
     "M5",
     "M332",
@@ -150,9 +164,10 @@ export function buildJob(req: JobRequest, opts: BuildOptions = {}): BuildResult 
     gcode: writeGcode(lines),
     lines,
     path,
+    chamfer,
     scene,
     svg: sceneToSvg(scene),
-    summary: summarise(path, stock),
+    summary: summarise(path, stock, chamfer),
     reach: reachCheck(req),
   };
 }
@@ -181,14 +196,17 @@ export function writeGcode(lines: string[]): string {
  *   a non-default bit   `facing-aluminium-6mm-90x70-0.4mm-...`
  *   finish mode         `facing-brass-40x30-0.1mm-finish-...`
  *   a non-default pattern `facing-aluminium-40x30-0.2mm-spiral-...`
+ *   overhang on         `facing-aluminium-45.2x45.2-0.2mm-overhang-...`
+ *   a chamfer           `facing-aluminium-45.2x45.2-0.2mm-overhang-chamfer0.2-...`
  *
  * Finish mode and the pattern matter here more than they look: a set of
  * 40x30x0.2 coupons differs only by those, so without them in the name the
  * second download silently replaces the first and the comparison you cut them
  * for is gone.
  *
- * The defaults keep the plain name, so the pattern PLAN.md documents still holds
- * for every job run so far.
+ * The plain name means serpentine-x, the pattern every job before 0.9.0 was
+ * cut with, so files already on disk keep meaning what they did. The default
+ * since then, serpentine-y, is named like any other pattern.
  */
 export function filenameFor(req: JobRequest, now = new Date()): string {
   const d = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
@@ -196,8 +214,10 @@ export function filenameFor(req: JobRequest, now = new Date()): string {
   const isDefaultBit = !recipe || MATERIALS[req.material]?.tools[0]?.id === recipe.id;
   const bit = isDefaultBit ? "" : `-${recipe.tool.diameter}mm`;
   const mode = req.mode === "finish" ? "-finish" : "";
-  const pattern = req.pattern && req.pattern !== DEFAULT_PATTERN ? `-${req.pattern}` : "";
-  return `facing-${req.material}${bit}-${g(req.width)}x${g(req.height)}-${g(req.depth)}mm${pattern}${mode}-${d}.nc`;
+  const effective = req.mode === "finish" ? "serpentine-x" : req.pattern ?? DEFAULT_PATTERN;
+  const pattern = effective !== "serpentine-x" ? `-${effective}` : "";
+  const overhang = (req.overhang ? "-overhang" : "") + (req.chamfer ? `-chamfer${g(req.chamfer)}` : "");
+  return `facing-${req.material}${bit}-${g(req.width)}x${g(req.height)}-${g(req.depth)}mm${overhang}${pattern}${mode}-${d}.nc`;
 }
 
 const pad = (n: number) => n.toString().padStart(2, "0");

@@ -82,8 +82,9 @@ describe("the preamble and trailer", () => {
 
 describe("the filename", () => {
   test("facing-<material>-<X>x<Y>-<depth>mm-<YYYYMMDD>.nc", () => {
-    expect(filenameFor(REQ, AT)).toBe("facing-mdf-80x60-0.3mm-20260921.nc");
-    expect(filenameFor({ ...REQ, material: "brass", width: 40.5, depth: 1 }, AT))
+    const x = { ...REQ, pattern: "serpentine-x" } as const;
+    expect(filenameFor(x, AT)).toBe("facing-mdf-80x60-0.3mm-20260921.nc");
+    expect(filenameFor({ ...x, material: "brass", width: 40.5, depth: 1 }, AT))
       .toBe("facing-brass-40.5x60-1mm-20260921.nc");
   });
 });
@@ -92,7 +93,7 @@ describe("the human-readable comments", () => {
   test("say the size, the depth, the material, the pattern and the pass count", () => {
     const c = build({ depth: 2.5 }).lines.filter((l) => l.startsWith("("));
     expect(c[0]).toBe("(Facing 80 x 60 mm, 2.5 mm deep, MDF)");
-    expect(c[1]).toBe("(Serpentine along X)");
+    expect(c[1]).toBe("(Serpentine along Y)");
     expect(c[2]).toMatch(/^\(3 passes at 1.429 mm stepover, ~\d+\.\d min\)$/);
     expect(c[3]).toBe(`(Generated 2026-09-21 14:05 by cnc-facing ${VERSION})`);
   });

@@ -32,6 +32,24 @@ describe("general mode is untouched", () => {
   });
 });
 
+describe("finish mode's strategy is not the general default", () => {
+  // Since 0.9.0 general mode defaults to serpentine-y. Finish mode must still
+  // rough along X, or its rotated finishing pass lands on X, the worse axis.
+  const levels = build({ mode: "finish" }).path.levels;
+
+  test("roughs along X and finishes along Y", () => {
+    expect(levels.slice(0, -1).map((l) => l.pattern).every((p) => p === "serpentine-x")).toBe(true);
+    expect(levels.at(-1)!.pattern).toBe("serpentine-y");
+    expect(levels.at(-1)!.isFinish).toBe(true);
+  });
+
+  test("the whole entered depth is reached, the finish taking the last allowance", () => {
+    const allowance = resolve("aluminium")!.finishAllowance;
+    expect(levels.at(-1)!.z).toBeCloseTo(BASE.depth, 9);
+    expect(levels.at(-2)!.z).toBeCloseTo(BASE.depth - allowance, 9);
+  });
+});
+
 describe("the finishing pass", () => {
   const r = build({ mode: "finish" });
   const levels = r.path.levels;
@@ -178,8 +196,8 @@ describe("what the summary says", () => {
 
   test("it admits the strategy is ours even though the feeds are Makera's", () => {
     const w = build({ mode: "finish" }).summary.warnings.map((x) => x.text).join(" ");
-    expect(w).toContain("finishing strategy is not");
-    expect(w).toContain("90°");
+    expect(w).toContain("total depth");
+    expect(w).toContain("along Y");
   });
 
   test("finish mode costs time — that is the trade", () => {

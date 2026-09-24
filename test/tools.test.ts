@@ -107,10 +107,14 @@ describe("choosing a bit", () => {
 
 describe("the filename", () => {
   test("keeps the pattern PLAN.md documents, with one bit in play", () => {
-    expect(filenameFor(REQ, AT)).toBe("facing-mdf-80x60-0.3mm-20260921.nc");
-    expect(filenameFor({ ...REQ, material: "brass", depth: 0.1 }, AT))
+    // The plain name is serpentine-x, as it was for every job before 0.9.0;
+    // the default since then is named like any other pattern.
+    const x = { ...REQ, pattern: "serpentine-x" } as const;
+    expect(filenameFor(x, AT)).toBe("facing-mdf-80x60-0.3mm-20260921.nc");
+    expect(filenameFor({ ...x, material: "brass", depth: 0.1 }, AT))
       .toBe("facing-brass-80x60-0.1mm-20260921.nc");
-    expect(filenameFor({ ...REQ, mode: "general" }, AT)).toBe("facing-mdf-80x60-0.3mm-20260921.nc");
+    expect(filenameFor({ ...x, mode: "general" }, AT)).toBe("facing-mdf-80x60-0.3mm-20260921.nc");
+    expect(filenameFor(REQ, AT)).toBe("facing-mdf-80x60-0.3mm-serpentine-y-20260921.nc");
   });
 
   test("names finish mode, so the two coupons of a comparison cannot collide", () => {
@@ -119,7 +123,7 @@ describe("the filename", () => {
     const coupon = { ...REQ, material: "brass", width: 40, height: 30, depth: 0.1 } as const;
     const a = filenameFor({ ...coupon, mode: "general" }, AT);
     const b = filenameFor({ ...coupon, mode: "finish" }, AT);
-    expect(a).toBe("facing-brass-40x30-0.1mm-20260921.nc");
+    expect(a).toBe("facing-brass-40x30-0.1mm-serpentine-y-20260921.nc");
     expect(b).toBe("facing-brass-40x30-0.1mm-finish-20260921.nc");
     expect(a).not.toBe(b);
   });
