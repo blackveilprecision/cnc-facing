@@ -125,7 +125,7 @@ export interface BitUsage {
   /** Makera's row for this bit and material; null if Makera publishes none. */
   readonly published?: Row | null;
   /** Per field: over Makera's figure, or over it by a recorded choice. */
-  readonly over: Partial<Record<keyof Row, "over" | "deviation">>;
+  readonly over: Partial<Record<keyof Row, "over" | "under" | "deviation">>;
 }
 
 export interface CheckOptions {
@@ -1242,6 +1242,23 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
     };
     if (!isDrill) ceiling("feed", u.feed, u.feedLine);
     ceiling("plunge", u.plunge, u.plungeLine);
+    // The project rule (2026-09-24): ALWAYS Makera's speeds and feeds. Over the
+    // table is caught by ceiling() above; UNDER it is flagged here, because a
+    // number that differs from the table is almost always a form slip, not a
+    // choice. Depth per pass stays a ceiling: shallower passes are normal.
+    const under = (field: "feed" | "plunge", v: number | null, line?: number) => {
+      if (v === null || v >= row[field] - EPS) return;
+      over[field] = "under";
+      const what = field === "feed" ? "feed" : "plunge";
+      out.add({
+        level: "warn", code: `${field}-under-table`,
+        title: `T${num} ${what} ${fmt(v)} mm/min, under Makera's ${row[field]} mm/min`,
+        detail: `This project always uses Makera's figures. For the ${bit.name} in ${label} that is ${row.rpm} rpm / F${row.feed} / plunge ${row.plunge}. A lower number is usually a slip in the CAM form, so check the field rather than assume it was meant.`,
+        source: "TOOLING.md, from wiki.makera.com/en/speeds-and-feeds",
+      }, line, line ? rawLines[line - 1]?.trim() : undefined);
+    };
+    if (!isDrill) under("feed", u.feed, u.feedLine);
+    under("plunge", u.plunge, u.plungeLine);
     ceiling("doc", used.doc, isDrill ? u.peckLine : u.docLine);
     // Speed: what matters is the chip. A lower rpm at the same feed takes a
     // bigger bite per revolution, which is how S1200-for-12000 snaps a bit.
@@ -1258,10 +1275,11 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           source: "TOOLING.md",
         });
       } else {
+        over.rpm = "under";
         out.add({
-          level: "note", code: "rpm-differs",
+          level: "warn", code: "rpm-differs",
           title: `T${num} at S${s}, where Makera gives ${row.rpm}`,
-          detail: `The chip load stays within Makera's (F${fmt(u.feed ?? 0)} at ${s} rpm), so this is a lighter cut, not a riskier one.`,
+          detail: `The chip load stays within Makera's (F${fmt(u.feed ?? 0)} at ${s} rpm), so this is a lighter cut, not a riskier one. But this project always uses Makera's figures, and a speed that differs is how S1200-for-12000 slipped through before: check the field.`,
           source: "TOOLING.md",
         });
       }

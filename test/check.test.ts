@@ -335,10 +335,15 @@ describe("the bits, against Makera's table", () => {
     expect(codes(r, "warn")).toContain("chipload-over-table");
   });
 
-  test("a faster spindle at the same feed is a lighter chip: only a note", () => {
+  test("a faster spindle at the same feed is a lighter chip, but still a warning: always Makera's figures", () => {
     const r = mutate((ls) => ls.map((l) => l.replace("S10000 M3", "S12000 M3")));
-    expect(r.findings.find((f) => f.code === "rpm-differs")!.level).toBe("note");
+    expect(r.findings.find((f) => f.code === "rpm-differs")!.level).toBe("warn");
     expect(codes(r)).not.toContain("chipload-over-table");
+  });
+
+  test("a feed under Makera's figure is a warning too", () => {
+    const r = mutate((ls) => ls.map((l) => l.replace(/F(\d+)$/, (_, f) => `F${Math.round(Number(f) * 0.6)}`)));
+    expect(codes(r, "warn")).toContain("feed-under-table");
   });
 
   test("a non-metal bit in aluminium fails", () => {
