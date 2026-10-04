@@ -1,0 +1,19 @@
+---
+# facing.nottseter.no on bf.nottseter.no. Pulls the image built by
+# .github/workflows/build.yml; never builds on the host. Pin a commit with
+# FACING_VERSION=<short-sha>. Joins the mett project's network so its Caddy can
+# reach it by name; the site block lives in mett-deploy/docker/Caddyfile.
+name: facing
+
+services:
+  facing:
+    image: ghcr.io/nilsan/cnc-facing:${FACING_VERSION:-latest}
+    restart: unless-stopped
+    expose:
+      - "3117"
+    networks:
+      - docker_default
+
+networks:
+  docker_default:
+    external: true

@@ -660,3 +660,14 @@ src/materials.ts   the speeds-and-feeds table, one source citation per row
 
 `facing.ts` and `mkr.ts` are pure and separately testable. They are where the
 machine knowledge lives and what a regression would silently break.
+
+## Deployment (facing.nottseter.no)
+
+Pushes to `main` run `.github/workflows/build.yml`: typecheck, tests, then build
+and push `ghcr.io/nilsan/cnc-facing:latest` (and `:<short-sha>`). Once the
+Action is green, `deploy/deploy.sh` ships `deploy/docker-compose.yml` to
+bf.nottseter.no, pulls and recreates the container. Caddy's site block for the
+domain lives in the mett-deploy repo's Caddyfile, and the container joins that
+project's `docker_default` network. The image sets `CNC_FACING_ALLOW` to
+everything: behind the proxy the peer address is Caddy's, so the built-in subnet
+allow-list cannot work, and the site is deliberately open.
