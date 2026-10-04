@@ -8,6 +8,7 @@
  */
 
 import { afterAll, describe, expect, test } from "bun:test";
+import { networkInterfaces } from "node:os";
 
 const PATHS = ["/", "/api/materials", "/api/plan", "/api/download", "/api/check"];
 
@@ -78,22 +79,28 @@ describe("with loopback NOT allowed", () => {
   }, 20_000);
 });
 
+/** This host's own non-loopback IPv4 address; CI runners and the workshop box differ. */
+const LAN_IP = Object.values(networkInterfaces())
+  .flat()
+  .find((a) => a?.family === "IPv4" && !a.internal)?.address;
+const lanTest = LAN_IP ? test : test.skip;
+
 describe("binding", () => {
-  test("listens on all interfaces by default, not just localhost", async () => {
+  lanTest("listens on all interfaces by default, not just localhost", async () => {
     const s = await start({ CNC_FACING_ALLOW: "0.0.0.0/0,::/0" });
     running.push(s);
     // 127.0.0.1 would answer either way; the LAN address only answers if the
     // listener is not bound to loopback.
-    const res = await fetch(`http://172.16.123.15:${s.port}/api/materials`);
+    const res = await fetch(`http://${LAN_IP}:${s.port}/api/materials`);
     expect(res.status).toBe(200);
     s.proc.kill();
   }, 20_000);
 
-  test("HOST pins it to one interface when that is what is wanted", async () => {
+  lanTest("HOST pins it to one interface when that is what is wanted", async () => {
     const s = await start({ HOST: "127.0.0.1", CNC_FACING_ALLOW: "0.0.0.0/0,::/0" });
     running.push(s);
     expect((await fetch(`http://127.0.0.1:${s.port}/api/materials`)).status).toBe(200);
-    await expect(fetch(`http://172.16.123.15:${s.port}/api/materials`)).rejects.toThrow();
+    await expect(fetch(`http://${LAN_IP}:${s.port}/api/materials`)).rejects.toThrow();
     s.proc.kill();
   }, 20_000);
 });
