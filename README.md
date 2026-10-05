@@ -48,8 +48,8 @@ comes from the proxy.
 ## Deployment
 
 Pushes to `main` run `.github/workflows/build.yml` (typecheck, tests, then push
-`ghcr.io/nilsan/cnc-facing`). `deploy/docker-compose.yml` runs the image behind
-Caddy on bf.nottseter.no; `deploy/deploy.sh` pulls and recreates it.
+`ghcr.io/nilsan/cnc-facing`). The image runs as the `cnc-facing` stack in Komodo
+on bf.nottseter.no, using `deploy/docker-compose.yml`, behind Caddy.
 
 ## License
 
