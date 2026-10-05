@@ -58,21 +58,3 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/cnc-facing:${{ steps.sha.outputs.short }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  deploy:
-    name: redeploy via Komodo
-    needs: ghcr
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      # The image exists now, so Komodo's pull gets the new build. Only this
-      # one path is reachable on hook.nottseter.no (see mett-deploy's Caddyfile).
-      - name: Trigger the cnc-facing stack deploy
-        env:
-          KOMODO_WEBHOOK_SECRET: ${{ secrets.KOMODO_WEBHOOK_SECRET }}
-        run: |
-          curl -fsS -X POST \
-            -H "X-Gitlab-Token: ${KOMODO_WEBHOOK_SECRET}" \
-            -H "Content-Type: application/json" \
-            -d '{"ref":"refs/heads/main"}' \
-            https://hook.nottseter.no/listener/gitlab/stack/cnc-facing/deploy
