@@ -43,13 +43,6 @@ const HOST = process.env.HOST ?? "0.0.0.0";
 const ALLOW = parseAllow(process.env.CNC_FACING_ALLOW ?? DEFAULT_ALLOW);
 
 /**
- * Where the .nc is headed after the browser saves it. The Z1 is fed by scp from
- * a Windows laptop, and the habit is a `latest-facing.nc` pointing at the newest
- * file, so set CNC_FACING_SCP_TARGET and the summary prints the two commands.
- */
-const SCP_TARGET = process.env.CNC_FACING_SCP_TARGET ?? "";
-
-/**
  * A checkbox: FormData sends "on" when ticked and nothing when not. JSON
  * callers may send a boolean. Anything else is passed on for validate() to
  * refuse.
@@ -86,14 +79,6 @@ function parseRequest(body: unknown): JobRequest {
     pattern: b.pattern === undefined || b.pattern === "" ? undefined : (String(b.pattern) as JobRequest["pattern"]),
     stepover: b.stepover === undefined || b.stepover === "" ? fallback : num(b.stepover),
   };
-}
-
-function scpHint(filename: string): string[] {
-  if (!SCP_TARGET) return [];
-  return [
-    `ln -sf ${filename} latest-facing.nc`,
-    `scp latest-facing.nc ${SCP_TARGET}`,
-  ];
 }
 
 const json = (data: unknown, status = 200) =>
@@ -146,7 +131,6 @@ const server = Bun.serve({
           svg: built.svg,
           summary: built.summary,
           reach: built.reach,
-          scp: scpHint(built.filename),
           lineCount: built.lines.length,
         });
       }),
@@ -238,7 +222,4 @@ console.log(`  reachable from: ${ALLOW.map((c) => c.text).join(", ")}`);
 for (const u of urls) console.log(`  ${u}`);
 if (!urls.length) {
   console.log("  (no local IPv4 address is inside the allowlist — check CNC_FACING_ALLOW)");
-}
-if (!SCP_TARGET) {
-  console.log("Set CNC_FACING_SCP_TARGET=user@laptop:path to print the scp/symlink hint.");
 }

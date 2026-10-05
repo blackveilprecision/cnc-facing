@@ -1,5 +1,8 @@
 FROM oven/bun:1-alpine
 
+LABEL org.opencontainers.image.source="https://github.com/nilsan/cnc-facing" \
+      org.opencontainers.image.licenses="MPL-2.0"
+
 WORKDIR /app
 
 # Dependencies first (layer cache). Runtime has none, so this is cheap.

@@ -238,7 +238,6 @@
       <h2>Download</h2>
       <button type="submit" id="dl">Generate .nc</button>
       <div class="fname" id="fname"></div>
-      <pre id="scp" hidden></pre>
     </div>
   </form>
 
@@ -488,8 +487,6 @@ function renderOk(d) {
     `<td class="why">${s.why}</td></tr>`).join("");
   $("copyall").dataset.all = d.reach.map((s) => s.code).join("\n");
   $("fname").textContent = d.filename;
-  $("scp").hidden = d.scp.length === 0;
-  $("scp").textContent = d.scp.join("\n");
   $("dl").disabled = false;
   for (const el of form.elements) el.classList?.remove("bad");
 }
@@ -500,7 +497,6 @@ function renderRefused(refusals) {
   $("spec").innerHTML = "";
   $("cite").textContent = "";
   $("fname").textContent = "";
-  $("scp").hidden = true;
   $("dl").disabled = true;
   $("mdi").innerHTML = "";
   $("notes").innerHTML = refusals.map((r) => `<li class="bad">${r.text ?? r.message}</li>`).join("");
