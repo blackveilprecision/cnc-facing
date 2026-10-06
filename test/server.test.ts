@@ -59,7 +59,7 @@ describe("with loopback allowed", () => {
 
 describe("with loopback NOT allowed", () => {
   test("every route refuses with 403 — including the one that serves the form", async () => {
-    const s = await start({ CNC_FACING_ALLOW: "172.16.123.0/24" });
+    const s = await start({ CNC_FACING_ALLOW: "192.0.2.0/24" });
     running.push(s);
     for (const p of PATHS) {
       const res = await hit(s.port, p);
@@ -71,7 +71,7 @@ describe("with loopback NOT allowed", () => {
   }, 20_000);
 
   test("and the refusal leaks nothing about the job or the machine", async () => {
-    const s = await start({ CNC_FACING_ALLOW: "172.16.123.0/24" });
+    const s = await start({ CNC_FACING_ALLOW: "192.0.2.0/24" });
     running.push(s);
     const body = await (await hit(s.port, "/api/materials")).text();
     expect(body).toBe("Not available from this network.\n");

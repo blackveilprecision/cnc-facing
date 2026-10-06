@@ -258,8 +258,8 @@ ship behaviour, per the global rules.
   only gains were stepover and stiffness. Not worth a second collet and a second
   set of numbers. `Material.tools` stays an array so re-adding is a table entry.
 - **The app is on the LAN, deliberately narrowly.** It binds `0.0.0.0` so the
-  laptop at the machine can reach it, and answers only `172.16.123.0/24` plus
-  loopback (`CNC_FACING_ALLOW`). This box is on five subnets and Tailscale, so
+  laptop at the machine can reach it, and answers only loopback and the private
+  ranges (`CNC_FACING_ALLOW`). This box is on five subnets and Tailscale, so
   the wide listener needs the narrow allowlist to mean what was asked for.
 - **The jog control is the bottleneck for the reach check this app keeps asking
   for.** 10mm per press with a wait between makes walking a 150mm perimeter a

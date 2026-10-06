@@ -1,20 +1,19 @@
 /**
  * Which hosts may reach the app.
  *
- * Binding to 0.0.0.0 is what makes the app reachable from the workshop LAN, but
- * this machine is multi-homed -- 172.16.123.0/24, 172.30.150.0/24, two 10.100.x
- * nets, 10.11.12.0/24 and a Tailscale address -- so "listen on all interfaces"
- * means considerably more than "reachable from the workshop". The listener is
- * wide and the allowlist is narrow, which is the pair that actually expresses
- * the intent.
+ * Binding to 0.0.0.0 is what makes the app reachable from a laptop next to the
+ * machine, but a multi-homed host (several LANs, a VPN, Tailscale) makes "listen
+ * on all interfaces" mean considerably more than "reachable from the workshop".
+ * The listener is wide and the allowlist is narrow, which is the pair that
+ * actually expresses the intent.
  *
  * This is not authentication. It is a blunt "do not answer strangers" filter for
  * a tool with no login that generates files a machine will run. Anything that
  * needs real access control needs a real reverse proxy in front.
  */
 
-/** Default: the workshop subnet, plus loopback so the dev box can always reach it. */
-export const DEFAULT_ALLOW = "127.0.0.0/8,::1/128,172.16.123.0/24";
+/** Default: loopback and the private IPv4 ranges (RFC 1918), i.e. a home or workshop LAN. */
+export const DEFAULT_ALLOW = "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16";
 
 export interface Cidr {
   readonly text: string;

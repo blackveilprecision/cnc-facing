@@ -7,6 +7,8 @@ machine has taught.
 
 Live at <https://facing.nottseter.no>.
 
+![The facing form with toolpath preview](docs/facing.png)
+
 ```sh
 bun install
 bun run dev          # http://localhost:3117
@@ -19,7 +21,8 @@ bun run typecheck
 - **Facing jobs**: general mode (one pass per depth level) or fine finish
   (rough to an allowance, then a final pass at 90° with about half the
   stepover). Four patterns: serpentine X, serpentine Y (default), one-way Y,
-  spiral.
+  spiral. Serpentine Y is the default because Y is more rigid than X on this
+  machine (tested), so cutting along Y gives the flatter surface.
 - **Header and preview**: Makera's `;@MKR|` header, a toolpath thumbnail, and an
   MDI corner walk (the "reach" check) so the laser can be used to confirm the
   stock position before cutting.
@@ -27,23 +30,45 @@ bun run typecheck
   Makera's published speeds and feeds. Chamfer and fly-cutter options exist;
   the checker also knows Makera's table for other bits.
 - **Check a file** (`/#check`): reports Fail / Silent / Warning / Note findings
-  for an uploaded `.nc` and draws its toolpath. Nothing is stored.
+  for an uploaded `.nc` and draws its toolpath. Nothing is stored. It checks
+  that a file is valid Z1 code *within the parameters this project has tested*,
+  which were mainly PCB milling. "No findings" is not a promise that a job is
+  safe, and a Warning means "differs from what is known to work", not "wrong".
+
+![The check tab with a toolpath and findings](docs/check.png)
 
 The machine knowledge lives in `src/facing.ts`, `src/mkr.ts`, `src/materials.ts`
 and `src/check.ts`, with each rule commenting where it was learned. `PLAN.md`
 has the original design.
 
+## Docker
+
+```sh
+docker run --rm -p 3117:3117 ghcr.io/nilsan/cnc-facing:latest   # http://localhost:3117
+docker build -t cnc-facing .                                     # or build locally
+```
+
+The image has no volumes and stores nothing. Set options with `-e`, e.g.
+`-e PORT=8080` (then publish that port too).
+
 ## Configuration
+
+Settings are environment variables, read at startup in `src/server.ts`. Locally,
+set them inline (`PORT=8080 bun run dev`). In Docker, pass `-e VAR=value` to
+`docker run`, or put them under `environment:` in the service in
+`deploy/docker-compose.yml`. The image's defaults are set with `ENV` in the
+`Dockerfile`.
 
 | Variable | Default | |
 |---|---|---|
 | `PORT` | `3117` | |
 | `HOST` | `0.0.0.0` | `127.0.0.1` for localhost only |
-| `CNC_FACING_ALLOW` | `127.0.0.0/8,::1/128,172.16.123.0/24` | comma-separated CIDRs that may connect; `0.0.0.0/0,::/0` turns the filter off |
+| `CNC_FACING_ALLOW` | `127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` | comma-separated CIDRs that may connect (loopback and private LAN ranges); `0.0.0.0/0,::/0` turns the filter off |
 
-The allow-list is a blunt "do not answer strangers" filter, not authentication.
-The Docker image turns it off, since behind the reverse proxy every request
-comes from the proxy.
+The image overrides the `HOST`/`CNC_FACING_ALLOW` defaults above: it listens on
+`0.0.0.0` and has the filter off. The allow-list is a blunt "do not answer strangers" filter, not authentication.
+The filter is off in the image because behind the reverse proxy every request
+comes from the proxy; to use it without a proxy, set `CNC_FACING_ALLOW` yourself.
 
 ## Deployment
 
