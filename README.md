@@ -70,6 +70,12 @@ The image overrides the `HOST`/`CNC_FACING_ALLOW` defaults above: it listens on
 The filter is off in the image because behind the reverse proxy every request
 comes from the proxy; to use it without a proxy, set `CNC_FACING_ALLOW` yourself.
 
+Requests are rate-limited per client (a generous bucket for the form, a small one
+for `/api/check`, which parses whole files) and request bodies are size-capped.
+Behind a proxy the client is taken from `X-Forwarded-For`. `CNC_FACING_RATE_LIMIT=off`
+disables the limits, e.g. for load tests. The screenshots in `docs/` are made by
+`scripts/screenshots.py`.
+
 ## Deployment
 
 Pushes to `main` run `.github/workflows/build.yml` (typecheck, tests, then push

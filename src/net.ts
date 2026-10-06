@@ -109,3 +109,10 @@ export function reachableOn(cidrs: Cidr[], interfaces: Record<string, { address:
   }
   return out;
 }
+
+const PRIVATE = parseAllow("127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16");
+
+/** Loopback or an RFC 1918 address: a peer that can be a reverse proxy or a LAN host. */
+export function isPrivate(ip: string): boolean {
+  return matches(ip, PRIVATE);
+}

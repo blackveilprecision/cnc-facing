@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_ALLOW, matches, parseAllow, parseCidr, reachableOn } from "../src/net.ts";
+import { DEFAULT_ALLOW, isPrivate, matches, parseAllow, parseCidr, reachableOn } from "../src/net.ts";
 
 const allow = parseAllow(DEFAULT_ALLOW);
 
@@ -99,5 +99,12 @@ describe("reachableOn", () => {
   test("says nothing rather than guessing when no interface qualifies", () => {
     expect(reachableOn(parseAllow("192.168.9.0/24"), { lo: [{ address: "127.0.0.1", family: "IPv4" }] }))
       .toEqual([]);
+  });
+});
+
+describe("isPrivate", () => {
+  test("is true for loopback and RFC 1918, false for public addresses", () => {
+    for (const ip of ["127.0.0.1", "::1", "10.0.0.5", "172.18.0.2", "192.168.1.1"]) expect(isPrivate(ip)).toBe(true);
+    for (const ip of ["8.8.8.8", "100.64.0.1", "172.32.0.1"]) expect(isPrivate(ip)).toBe(false);
   });
 });

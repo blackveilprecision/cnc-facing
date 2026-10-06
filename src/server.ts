@@ -11,19 +11,46 @@ import { networkInterfaces } from "node:os";
 import { buildJob, VERSION } from "./gcode.ts";
 import { DEFAULT_PATTERN, PATTERNS } from "./facing.ts";
 import { PATTERN_LABELS } from "./summary.ts";
-import { DEFAULT_ALLOW, matches, parseAllow, reachableOn } from "./net.ts";
+import { DEFAULT_ALLOW, isPrivate, matches, parseAllow, reachableOn } from "./net.ts";
 import { MATERIALS, MATERIAL_IDS, DEFAULT_STEPOVER, isMaterialId, isToolId, resolve } from "./materials.ts";
 import { ENVELOPE_X, ENVELOPE_Y, type JobRequest } from "./validate.ts";
 import { checkGcode } from "./check.ts";
 import { CAT_MATERIALS, CAT_MATERIAL_LABELS, isCatMaterial } from "./catalogue.ts";
 import { reportToSvg } from "./checksvg.ts";
 import { reachWalk } from "./reach.ts";
+import { RateLimiter, type LimitClass } from "./ratelimit.ts";
 
 /**
  * Largest file /api/check reads. Makera Studio's 161,000-line sample is 3.2MB;
  * this leaves room for ten of those and stops short of reading anything absurd.
  */
 const CHECK_MAX_BYTES = 32 * 1024 * 1024;
+
+/** Largest JSON body the form routes read; a real job request is a few hundred bytes. */
+const JSON_MAX_BYTES = 16 * 1024;
+
+/**
+ * Read a body as text, giving up once it passes `max` bytes. The content-length
+ * header is only a claim -- a chunked upload has none -- so the count is of what
+ * actually arrives.
+ */
+async function readCapped(req: Request, max: number): Promise<string | null> {
+  if (!req.body) return "";
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      void reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
 
 const PORT = Number(process.env.PORT ?? 3117);
 
@@ -81,11 +108,40 @@ function parseRequest(body: unknown): JobRequest {
   };
 }
 
+/** Off for load tests; anything else keeps the limits on. */
+const RATE_LIMIT_ON = process.env.CNC_FACING_RATE_LIMIT !== "off";
+const limiter = new RateLimiter();
+
+/**
+ * Who is asking. Behind the reverse proxy every peer is the proxy, so a peer on a
+ * private address (the proxy, or a LAN user) is taken at its word about the
+ * client in X-Forwarded-For -- the last entry, which is the one the proxy added.
+ * A public peer's header is ignored, since there it is whatever the caller sent.
+ */
+function clientOf(req: Request, peer: string): string {
+  if (!isPrivate(peer)) return peer;
+  const fwd = req.headers.get("x-forwarded-for")?.split(",").pop()?.trim();
+  return fwd || peer;
+}
+
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
     headers: { "content-type": "application/json; charset=utf-8" },
   });
+
+/** The JSON body of a form request, or the response to refuse it with. */
+async function jsonBody(req: Request): Promise<{ ok: true; value: unknown } | { ok: false; response: Response }> {
+  const text = await readCapped(req, JSON_MAX_BYTES);
+  if (text === null) {
+    return { ok: false, response: json({ ok: false, refusals: ["That request is too large."] }, 413) };
+  }
+  try {
+    return { ok: true, value: JSON.parse(text) };
+  } catch {
+    return { ok: false, response: json({ ok: false, refusals: ["That request is not valid JSON."] }, 400) };
+  }
+}
 
 /**
  * Wraps a handler in the allowlist check.
@@ -99,12 +155,25 @@ const json = (data: unknown, status = 200) =>
  * is no proxy in front, so an X-Forwarded-For header would be whatever the
  * caller felt like sending.
  */
-function guard(handler: (req: Request, srv: Bun.Server<undefined>) => Response | Promise<Response>) {
+function guard(
+  handler: (req: Request, srv: Bun.Server<undefined>) => Response | Promise<Response>,
+  cost?: LimitClass,
+) {
   return async (req: Request, srv: Bun.Server<undefined>): Promise<Response> => {
     const ip = srv.requestIP(req)?.address;
     if (!ip || !matches(ip, ALLOW)) {
       console.warn(`refused ${ip ?? "unknown"} ${new URL(req.url).pathname}`);
       return new Response("Not available from this network.\n", { status: 403 });
+    }
+    if (cost && RATE_LIMIT_ON) {
+      const wait = limiter.take(clientOf(req, ip), cost);
+      if (wait) {
+        const error = `Too many requests. Try again in ${wait} s.`;
+        return new Response(JSON.stringify({ ok: false, error, refusals: [error] }), {
+          status: 429,
+          headers: { "content-type": "application/json; charset=utf-8", "retry-after": String(wait) },
+        });
+      }
     }
     return handler(req, srv);
   };
@@ -113,6 +182,8 @@ function guard(handler: (req: Request, srv: Bun.Server<undefined>) => Response |
 const server = Bun.serve({
   port: PORT,
   hostname: HOST,
+  // The socket-level backstop for the per-route caps above.
+  maxRequestBodySize: CHECK_MAX_BYTES + 1024 * 1024,
 
   routes: {
     "/": guard(() =>
@@ -123,7 +194,9 @@ const server = Bun.serve({
     /** Everything the form needs to know about a job, minus the G-code itself. */
     "/api/plan": {
       POST: guard(async (req) => {
-        const built = buildJob(parseRequest(await req.json()), { thumbnail: false });
+        const body = await jsonBody(req);
+        if (!body.ok) return body.response;
+        const built = buildJob(parseRequest(body.value), { thumbnail: false });
         if (!built.ok) return json({ ok: false, refusals: built.refusals }, 422);
         return json({
           ok: true,
@@ -133,13 +206,15 @@ const server = Bun.serve({
           reach: built.reach,
           lineCount: built.lines.length,
         });
-      }),
+      }, "form"),
     },
 
     /** The real thing, thumbnail and all. */
     "/api/download": {
       POST: guard(async (req) => {
-        const built = buildJob(parseRequest(await req.json()));
+        const body = await jsonBody(req);
+        if (!body.ok) return body.response;
+        const built = buildJob(parseRequest(body.value));
         if (!built.ok) return json({ ok: false, refusals: built.refusals }, 422);
         return new Response(built.gcode, {
           headers: {
@@ -149,7 +224,7 @@ const server = Bun.serve({
             "content-disposition": `attachment; filename="${built.filename}"`,
           },
         });
-      }),
+      }, "form"),
     },
 
     /**
@@ -163,7 +238,10 @@ const server = Bun.serve({
         if (size > CHECK_MAX_BYTES) {
           return json({ ok: false, error: `The file is ${(size / 1048576).toFixed(1)} MB; the checker reads up to ${CHECK_MAX_BYTES / 1048576} MB.` }, 413);
         }
-        const text = await req.text();
+        const text = await readCapped(req, CHECK_MAX_BYTES);
+        if (text === null) {
+          return json({ ok: false, error: `The checker reads up to ${CHECK_MAX_BYTES / 1048576} MB.` }, 413);
+        }
         const q = new URL(req.url).searchParams;
         const name = q.get("name") || "upload.nc";
         // The material column to check the bits against; omitted, the header's.
@@ -177,7 +255,7 @@ const server = Bun.serve({
           reach: report.reachBox ? reachWalk(report.reachBox) : [],
           materials: CAT_MATERIALS.map((id) => ({ id, label: CAT_MATERIAL_LABELS[id] })),
         });
-      }),
+      }, "check"),
     },
 
     /** The materials table, so the form does not restate what materials.ts knows. */

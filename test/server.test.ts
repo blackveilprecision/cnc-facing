@@ -104,3 +104,57 @@ describe("binding", () => {
     s.proc.kill();
   }, 20_000);
 });
+
+describe("limits", () => {
+  test("a chunked /api/check upload past the cap is refused, not read", async () => {
+    const s = await start({ CNC_FACING_ALLOW: "127.0.0.0/8,::1/128" });
+    running.push(s);
+    const big = new ReadableStream({
+      start(c) { for (let i = 0; i < 40; i++) c.enqueue(new Uint8Array(1024 * 1024).fill(71)); c.close(); },
+    });
+    const res = await fetch(`http://127.0.0.1:${s.port}/api/check`, {
+      method: "POST", body: big, duplex: "half",
+    } as RequestInit).catch(() => null);
+    // Bun may refuse at the socket (connection error) or answer 413; never 200.
+    expect(res === null || res.status === 413).toBe(true);
+    s.proc.kill();
+  }, 30_000);
+
+  test("an oversized JSON body to /api/plan is a 413", async () => {
+    const s = await start({ CNC_FACING_ALLOW: "127.0.0.0/8,::1/128" });
+    running.push(s);
+    const res = await fetch(`http://127.0.0.1:${s.port}/api/plan`, {
+      method: "POST", body: JSON.stringify({ ...JOB, pad: "x".repeat(100_000) }),
+    });
+    expect(res.status).toBe(413);
+    s.proc.kill();
+  }, 20_000);
+
+  test("/api/check answers 429 with Retry-After once the burst is spent", async () => {
+    const s = await start({ CNC_FACING_ALLOW: "127.0.0.0/8,::1/128" });
+    running.push(s);
+    const statuses: number[] = [];
+    let retry: string | null = null;
+    for (let i = 0; i < 8; i++) {
+      const res = await fetch(`http://127.0.0.1:${s.port}/api/check?name=a.nc`, { method: "POST", body: "G0 X1\n" });
+      statuses.push(res.status);
+      if (res.status === 429) retry = res.headers.get("retry-after");
+    }
+    expect(statuses.slice(0, 6).every((c) => c === 200)).toBe(true);
+    expect(statuses).toContain(429);
+    expect(Number(retry)).toBeGreaterThan(0);
+    s.proc.kill();
+  }, 30_000);
+
+  test("X-Forwarded-For from a private peer separates clients", async () => {
+    const s = await start({ CNC_FACING_ALLOW: "127.0.0.0/8,::1/128" });
+    running.push(s);
+    const hit = (ip: string) => fetch(`http://127.0.0.1:${s.port}/api/check?name=a.nc`, {
+      method: "POST", body: "G0 X1\n", headers: { "x-forwarded-for": ip },
+    }).then((r) => r.status);
+    for (let i = 0; i < 6; i++) await hit("203.0.113.1");
+    expect(await hit("203.0.113.1")).toBe(429);
+    expect(await hit("203.0.113.2")).toBe(200);
+    s.proc.kill();
+  }, 30_000);
+});
