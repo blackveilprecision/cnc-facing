@@ -2,8 +2,7 @@
  * The gate. Refuse with the offending value named; never emit a file that will
  * fail at the machine.
  *
- * This mirrors `fix_gcode.py --stock`, which exists because a header that does
- * not match its own job is a silent failure: the file runs, and the preview or
+ * A header that does not match its own job is a silent failure: the file runs, and the preview or
  * the boundary trace is wrong. Everything here is a refusal, not a warning.
  * Warnings (the metal-facing time, mostly) live in summary.ts and do not block.
  */
@@ -17,7 +16,7 @@ export const MIN_CHAMFER = 0.1;
 /**
  * The Z1's XY travel, mm.
  *
- * MILLING.md records it twice: "the machine's 200 x 200 envelope" (the facing
+ * Recorded twice from real jobs: "the machine's 200 x 200 envelope" (the facing
  * job needing +118.4 X / -158.4 Y "leaving only ~40mm of slack in Y"), and "A
  * 150 x 200 sheet is the machine's entire work area (200 x 200)".
  *
@@ -34,7 +33,7 @@ export const MIN_CHAMFER = 0.1;
  * Z travel is 100mm by the same published figure. It is not checked, because it
  * cannot bind: facing depth is capped by the tool's 12mm flutes long before it
  * runs out of Z. Recorded here so the next person
- * does not have to go looking, which PLAN.md had to.
+ * does not have to go looking.
  */
 export const ENVELOPE_X = 200;
 

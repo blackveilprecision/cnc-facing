@@ -2,7 +2,7 @@
  * The reach check, as MDI lines you can paste one at a time.
  *
  * Every job this app produces carries the warning that its origin has to sit far
- * enough back in the travel -- MILLING.md's facing job found that out from a
+ * enough back in the travel -- a facing job found that out from a
  * soft endstop mid-trace, after the file had already started. The check is to
  * drive the head to each corner first and watch it get there.
  *
@@ -18,7 +18,7 @@
  *
  * It is NOT what the controller's laser boundary trace walks. That was said
  * here until 2026-09-23 and was wrong: the trace follows the tool centre, so it
- * sits r-o inside the block. MILLING.md's first trace went to X1.587 Y158.412
+ * sits r-o inside the block. The first trace went to X1.587 Y158.412
  * for a 120 x 160 job, and a 45mm job on a 45.2mm block traced visibly inside it.
  */
 

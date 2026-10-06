@@ -20,7 +20,7 @@ describe("identifying a bit from its header name", () => {
     expect(id("3.175*2*12mm Drill")).toBe("drill-2");
   });
 
-  test("fix_gcode.py's names, label suffix and all", () => {
+  test("post-processed names, label suffix and all", () => {
     expect(id("3.175*0.3mm*30deg Engraving - ISOLATION")).toBe("engr-0.3-30");
     expect(id("3.175*1*10mm Drill - 42 HOLES")).toBe("drill-1");
     expect(id("3.175*2*10.5mm Corn - 3.0+3.2mm HOLES")).toBe("corn-2");
@@ -77,7 +77,7 @@ describe("the table", () => {
   });
 
   test("materials.ts's facing rows are the same numbers as the catalogue's", () => {
-    // Both cite the same TOOLING.md row; this is what stops them drifting.
+    // Both cite the same speeds-and-feeds row; this is what stops them drifting.
     const row = bitById("flat-3.175-12")!.rows;
     const column = { mdf: row.hardwood, aluminium: row.aluminum, brass: row.brass } as const;
     for (const [m, want] of Object.entries(column)) {

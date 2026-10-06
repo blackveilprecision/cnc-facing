@@ -21,7 +21,7 @@ describe("line endings", () => {
   test("CRLF throughout, including the last line", () => {
     // Matches Makera Studio's output. Not the cause of the blank preview, which
     // it was once blamed for -- an LF file previews fine (load test 08); the
-    // cause was the tool change written M6 T<n> (EASYTRACE-Z1.md). See writeGcode.
+    // cause was the tool change written M6 T<n>. See writeGcode.
     const { gcode } = build();
     expect(gcode.endsWith(EOL)).toBe(true);
     expect(gcode.split("\n").length - 1).toBe(gcode.split("\r\n").length - 1);

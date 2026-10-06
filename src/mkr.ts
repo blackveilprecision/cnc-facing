@@ -3,10 +3,10 @@
  *
  * For seven machine trips this block, and TOOL-before-TIME in particular, was
  * believed to be what makes the controller's toolpath preview and laser
- * boundary trace work. The 2026-09-24 load tests (EASYTRACE-Z1.md) disproved
+ * boundary trace work. The 2026-09-24 load tests disproved
  * that: a file with no header at all previews and traces normally, and so does
  * one with TIME before TOOL. The real cause of every blank preview was the tool
- * change written `M6 T<n>` instead of `T<n> M6`, which --makera-style happened
+ * change written `M6 T<n>` instead of `T<n> M6`, which a post-processing flag happened
  * to fix at the same time.
  *
  * What the header visibly does:
@@ -27,7 +27,7 @@
  *   TOOLPATH...    <- then the toolpath list
  *   END
  *
- * (TIME before TOOL, once blamed, previews fine: load test 21.)
+ * (TIME before TOOL, once blamed, previews fine, tested 2026-09-24.)
  */
 
 import type { ChamferPlan } from "./chamfer.ts";
@@ -100,8 +100,7 @@ export function mkrHeader(opts: {
     // The work origin sits on the stock's BACK-left edge (y=+W/2), expressed
     // from the stock's centre, because the job sweeps into -Y. `topFrontLeft` is
     // the only type_name the parser is known to accept, so the corner is moved
-    // by the numbers rather than by the name -- the same thing fix_gcode.py does
-    // for a top-left-origin board.
+    // by the numbers rather than by the name -- the usual way to handle a top-left-origin board.
     `;@MKR|ORIGIN|id=0|type_name=topFrontLeft|x=${g(-L / 2)}|y=${g(W / 2)}|z=${g(H / 2)}`,
     `;@MKR|CAM|id=cnc-facing|name=cnc-facing|v=${opts.camVersion}`,
     ";@MKR|UNIT|value=mm",

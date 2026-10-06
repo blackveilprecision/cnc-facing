@@ -2,7 +2,7 @@
  * Makera's official bits and the speeds and feeds Makera publishes for them,
  * for checking what an uploaded file actually does with each bit.
  *
- * Transcribed from TOOLING.md (~/src/ha/esp/garasje), which in turn transcribes
+ * Transcribed from
  * <https://wiki.makera.com/en/speeds-and-feeds> (re-read in full 2026-09-20).
  * Only the bits in the Essential Milling Bit Set (Extended) on the shelf, the
  * 0.5mm drills bought separately, and the 3.175*12mm drill Makera lists with the
@@ -127,7 +127,7 @@ export interface Deviation {
 export const DEVIATIONS: readonly Deviation[] = [
   {
     bit: "engr-0.3-30", material: "pcb", field: "doc", value: 0.12,
-    why: "Isolation at -0.12 rather than 0.1: on a V-bit depth sets cut width, and 0.364mm wide is what clears the 0.84mm header-pad gap in two passes (TOOLING.md, 'What this project actually uses').",
+    why: "Isolation at -0.12 rather than 0.1: on a V-bit depth sets cut width, and 0.364mm wide is what clears the 0.84mm header-pad gap in two passes (from PCB isolation tests).",
   },
 ];
 
@@ -144,7 +144,7 @@ export interface Parsed {
  * Read a bit from its name, in any of the three styles seen here:
  *
  *   Makera Studio   `3.175*12mm Flat End(Metal)`, `3.175*2*12mm Drill`
- *   fix_gcode.py    `3.175*0.3mm*30deg Engraving - ISOLATION`, `3.175*2*10.5mm Corn - ...`
+ *   post-processed     `3.175*0.3mm*30deg Engraving - ISOLATION`, `3.175*2*10.5mm Corn - ...`
  *   this app        `3.175*12mm Flat End - FACING`
  *
  * Makera prefixes a 3.175 shank when the cutter is smaller (`3.175*2*8mm`), and

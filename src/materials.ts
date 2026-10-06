@@ -1,6 +1,6 @@
 /**
- * Material x tool -> feeds, transcribed from TOOLING.md, which in turn
- * transcribes <https://wiki.makera.com/en/speeds-and-feeds> (re-read 2026-09-20,
+ * Material x tool -> feeds, transcribed from
+ * <https://wiki.makera.com/en/speeds-and-feeds> (re-read 2026-09-20,
  * and scraped in full 2026-09-21 -- the tables are in the served HTML, a plain
  * fetch renders only the title).
  *
@@ -13,8 +13,8 @@
  * TOOLS
  *
  * The 3.175x12mm single-flute Metal-series flat end is the default everywhere.
- * It is the bit surface_spoilboard.py declares and every faced board so far has
- * used. PLAN.md said metal facing had to drop to the 2x8mm bit because "the
+ * It is the bit the reference script declares and every faced board so far has
+ * used. An early plan said metal facing had to drop to the 2x8mm bit because "the
  * 3.175mm flat end is a NON-METAL bit". The distinction is the SERIES, not the
  * diameter: the shelf has 3.175mm flat ends in both, all the same 3.175mm
  * cutting diameter. The 25mm and 42mm ones are the non-metal series, wood and
@@ -71,7 +71,7 @@ export interface ToolProfile {
 /**
  * The chamfer pass: a lap round the block's top edge with the 90° chamfering
  * bit, after the facing, in the same file. Makera's published row for
- * `0.1mm*90° Chamfering` (TOOLING.md, "Chamfering"), per material.
+ * `0.1mm*90° Chamfering` (Makera's speeds and feeds, "Chamfering"), per material.
  */
 export interface ChamferProfile {
   readonly tool: ChamferTool;
@@ -91,7 +91,7 @@ export interface ChamferTool extends Tool {
 }
 
 /**
- * Five on the shelf (TOOLING.md, "The actual inventory"). `type=Engraving`
+ * Five on the shelf (the bits in Makera's Essential Milling Bit Set). `type=Engraving`
  * because that is the V-bit type word the controller has accepted in every PCB
  * header here, with halfAngle carrying the geometry. The cone runs from the
  * 0.1mm tip to the 3.175 shank at 45°, about 1.5mm tall.
@@ -106,7 +106,7 @@ export const CHAMFER_90: ChamferTool = {
   halfAngle: 45,
 };
 
-const CHAMFER_SOURCE = "TOOLING.md, Chamfering, `0.1mm*90° Chamfering`";
+const CHAMFER_SOURCE = "Makera's speeds and feeds, Chamfering, `0.1mm*90° Chamfering`";
 
 /** Chamfer width offered by default, mm: takes the sharp edge off, no more. */
 export const DEFAULT_CHAMFER = 0.2;
@@ -145,7 +145,7 @@ export const MAX_FEEDRATE = 1200;
 
 /**
  * The 3.175x12mm single-flute Metal series. Two on the shelf.
- * Field values match what surface_spoilboard.py declares, so the controller sees
+ * Field values match what the reference script declares, so the controller sees
  * the same tool it has seen on every faced job so far.
  */
 const FLAT_3175: Tool = {
@@ -158,7 +158,7 @@ const FLAT_3175: Tool = {
 
 
 /**
- * 0.45 of tool diameter is surface_spoilboard.py's figure, picked conservatively
+ * 0.45 of tool diameter is the reference script's figure, picked conservatively
  * for MDF's ragged fibres, and it is what every faced board on this machine was
  * cut with.
  *
@@ -190,9 +190,9 @@ export const MATERIALS: Record<MaterialId, Material> = {
         maxDepthPerPass: 1.0,
         stepover: 0.45,
         finishStepover: 0.22,
-        source: "TOOLING.md, Single Flute Metal, `3.175*12mm Flat End(Metal)`, Hardwood column",
+        source: "Makera's speeds and feeds, Single Flute Metal, `3.175*12mm Flat End(Metal)`, Hardwood column",
         derived: false,
-        note: "Makera publishes no MDF column for milling. Hardwood is the conservative read of the two wood columns (softwood allows 2.0mm/pass) and is what surface_spoilboard.py has always used.",
+        note: "Makera publishes no MDF column for milling. Hardwood is the conservative read of the two wood columns (softwood allows 2.0mm/pass) and is what every faced board on this machine has been cut with.",
       },
     ],
   },
@@ -214,7 +214,7 @@ export const MATERIALS: Record<MaterialId, Material> = {
         maxDepthPerPass: 0.2,
         stepover: 0.45,
         finishStepover: 0.22,
-        source: "TOOLING.md, Single Flute Metal, `3.175*12mm Flat End(Metal)`, Aluminum column",
+        source: "Makera's speeds and feeds, Single Flute Metal, `3.175*12mm Flat End(Metal)`, Aluminum column",
         derived: false,
         note: "Vendor figures. Note the surface speed is only 120 m/min, which is low for carbide in aluminium and is where built-up edge comes from — so if a test coupon comes out cloudy grey rather than bright, suspect that before the feeds, and go shallower rather than faster.",
       },
@@ -238,7 +238,7 @@ export const MATERIALS: Record<MaterialId, Material> = {
         maxDepthPerPass: 0.1,
         stepover: 0.45,
         finishStepover: 0.22,
-        source: "TOOLING.md, Single Flute Metal, `3.175*12mm Flat End(Metal)`, Brass column",
+        source: "Makera's speeds and feeds, Single Flute Metal, `3.175*12mm Flat End(Metal)`, Brass column",
         derived: false,
         note: "The slowest combination here: 0.1mm per pass at 300mm/min. Check the time estimate before committing the machine; a shallower total depth is usually the fix.",
       },

@@ -15,10 +15,9 @@
  *   warn     differs from what is known to work, or looks like a known mistake.
  *   note     worth knowing; includes the things that are genuinely UNKNOWN.
  *
- * What is NOT asserted matters as much. MILLING.md and EASYTRACE-Z1.md are
- * explicit about what was tested and turned out harmless (CRLF, the header's
- * field order, most of the header itself: the 2026-09-24 load tests), and what
- * was never tested at all (literal canned cycles, embedded G32). Those come out
+ * What is NOT asserted matters as much. What was tested and turned out harmless
+ * (CRLF, the header's field order, most of the header itself: the 2026-09-24
+ * load tests), and what was never tested at all (literal canned cycles, embedded G32). Those come out
  * as warn or note, never fail, because refusing a file on a guess is how a
  * checker stops being believed.
  *
@@ -146,7 +145,7 @@ export interface CheckReport {
   readonly reachBox: Box | null;
 }
 
-/** Rapids charged at this in the time estimate, as facing.ts and fix_gcode.py do. */
+/** Rapids charged at this in the time estimate, as facing.ts does. */
 const RAPID_FEED = 1000;
 
 /**
@@ -157,7 +156,7 @@ const SPINDLE_MAX = 13000;
 
 /**
  * Below this an S word is more likely a dropped zero than a choice. S1200 for
- * 12000 turned up four times in EasyTrace forms (MILLING.md); at 1200 rpm and
+ * 12000 turned up four times in EasyTrace forms; at 1200 rpm and
  * F500 the 2mm corn bit snaps. The lowest speed used on purpose here is 6000.
  */
 const RPM_TYPO_BELOW = 5000;
@@ -269,7 +268,7 @@ function arcPoints(from: Pt3, to: Pt3, i: number, j: number, cw: boolean): Pt3[]
   const a1 = Math.atan2(to.y - cy, to.x - cx);
   let sweep = cw ? a0 - a1 : a1 - a0;
   // A full circle -- end equal to start -- is one the Z1 is known to handle
-  // (MILLING.md, verified on copper 2026-09-21), so it is a full turn, not zero.
+  // (verified on copper 2026-09-21), so it is a full turn, not zero.
   if (sweep <= EPS) sweep += 2 * Math.PI;
   const step = r > 0.01 ? 2 * Math.acos(Math.max(-1, 1 - 0.01 / r)) : Math.PI / 4;
   const n = Math.max(2, Math.min(720, Math.ceil(sweep / step)));
@@ -286,7 +285,7 @@ function arcPoints(from: Pt3, to: Pt3, i: number, j: number, cw: boolean): Pt3[]
 /** The M codes this controller is known to accept, with what they do here. */
 const KNOWN_M = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 30, 331, 332, 370, 801, 802, 811, 812, 821, 822, 851, 852]);
 
-/** G codes whose handling on this machine is recorded (MILLING.md, supported-codes). */
+/** G codes whose handling on this machine is recorded. */
 const KNOWN_G = new Set([0, 1, 2, 3, 4, 17, 21, 28, 90, 94]);
 
 export function checkGcode(text: string, filename = "upload.nc", opts: CheckOptions = {}): CheckReport {
@@ -303,20 +302,8 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
     out.add({
       level: "note", code: "extension",
       title: `The file is called .${filename.split(".").pop() ?? ""}, not .nc`,
-      detail: "A .cnc file loads, previews and traces like a .nc one (load test 20, 2026-09-24), but Windows Explorer shows no thumbnail for it. EasyTrace5000 writes .cnc. Other extensions have not been tried.",
-      source: "EASYTRACE-Z1.md",
-    });
-  }
-  if (lineEndings === "lf" || lineEndings === "mixed") {
-    // A NOTE, deliberately. CRLF was long blamed for the blank preview, but an
-    // LF file previews and traces normally (load test 08, 2026-09-24). The cause
-    // was the tool change written M6 T<n>. Makera writes CRLF and matching it
-    // costs nothing; that is all.
-    out.add({
-      level: "note", code: "line-endings",
-      title: lineEndings === "lf" ? "LF line endings, not CRLF" : "Mixed CRLF and LF line endings",
-      detail: "Makera Studio writes CRLF, and this app's own files match it. An LF file previews and traces normally (load test 08), so this is only a difference from Makera's output.",
-      source: "EASYTRACE-Z1.md, load tests 2026-09-24",
+      detail: "A .cnc file loads, previews and traces like a .nc one, but Windows Explorer shows no thumbnail for it. EasyTrace5000 writes .cnc. Other extensions have not been tried.",
+      source: "Observed on a Z1",
     });
   }
   // The thumbnail is base64, so this is about comments and typing, not bulk.
@@ -326,7 +313,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       level: "warn", code: "non-ascii",
       title: "Non-ASCII characters",
       detail: "The controller is a byte parser reading off a USB stick. Nothing has failed from this yet, but there is nothing to gain from it: an em-dash typed into a comment is the usual culprit.",
-      source: "PLAN.md, 'Found while building'",
+      source: "Observed on a Z1",
     }, nonAscii + 1, rawLines[nonAscii]!.slice(0, 120));
   }
 
@@ -369,14 +356,14 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
     out.add({
       level: "warn", code: "mkr-missing",
       title: "No ;@MKR| header",
-      detail: "The preview and the laser boundary trace work without one (load tests 18 and 23, 2026-09-24). What is lost: no stock box in the Machining Wizard, and no tool names. Makera Studio shows each tool's name at the tool change, next to the LED count, and that text comes from the header's TOOL lines.",
-      source: "EASYTRACE-Z1.md, load tests 2026-09-24; src/mkr.ts",
+      detail: "The preview and the laser boundary trace work without one. What is lost: no stock box in the Machining Wizard, and no tool names. Makera Studio shows each tool's name at the tool change, next to the LED count, and that text comes from the header's TOOL lines.",
+      source: "Z1 load tests; src/mkr.ts",
     });
   } else {
     // Makera Studio's field order, reported as a NOTE. TIME before TOOL was
     // believed for seven machine trips to blank the preview, but a header in
-    // exactly that order previews and traces normally (load test 21,
-    // 2026-09-24). The real cause was the tool change written M6 T<n>.
+    // exactly that order previews and traces normally (tested).
+    // The real cause was the tool change written M6 T<n>.
     const order = MKR_FIELD_ORDER as readonly string[];
     let highest = -1;
     let highestTag = "";
@@ -396,9 +383,9 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           level: "note", code: timeFirst ? "mkr-time-before-tool" : "mkr-order",
           title: timeFirst ? "TIME comes before TOOL in the header" : `;@MKR|${m.tag} is out of order (after ${highestTag})`,
           detail: timeFirst
-            ? "Long blamed for the blank preview, but a header in exactly this order previews and traces normally (load test 21). Only a difference from Makera Studio's order."
-            : `Makera Studio writes ${order.join(" ")}. The order has not been seen to matter (load test 21), so this is only a difference.`,
-          source: "EASYTRACE-Z1.md, load tests 2026-09-24; src/mkr.ts",
+            ? "Long blamed for the blank preview, but a header in exactly this order previews and traces normally. Only a difference from Makera Studio's order."
+            : `Makera Studio writes ${order.join(" ")}. The order has not been seen to matter, so this is only a difference.`,
+          source: "Z1 load tests; src/mkr.ts",
         }, m.line, rawLines[m.line - 1]);
       }
       if (at > highest) { highest = at; highestTag = m.tag; }
@@ -407,24 +394,24 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       out.add({
         level: "note", code: "mkr-not-first",
         title: "The header does not start the file with ;@MKR|BEGIN",
-        detail: "Every Makera Studio file opens with ;@MKR|BEGIN on line 1. Where the header sits has not been seen to matter; a file with no header at all previews (load test 18).",
-        source: "EASYTRACE-Z1.md",
+        detail: "Every Makera Studio file opens with ;@MKR|BEGIN on line 1. Where the header sits has not been seen to matter; a file with no header at all previews.",
+        source: "Observed on a Z1",
       }, mkr[0]!.line, rawLines[mkr[0]!.line - 1]);
     }
-    // Tested one at a time on 2026-09-24 (load tests 09-15, 17): leaving any of
+    // Tested one at a time: leaving any of
     // these out changes nothing but the stock box, which only STOCK draws.
     const MISSING: Record<string, string> = {
-      STOCK: "No stock box in the Machining Wizard; the preview and the laser trace are unaffected (load test 14). The box is always drawn at Anchor1, the bottom-left L-bracket, not at the work origin.",
-      ORIGIN: "No visible effect (load test 15): the toolpath is drawn at the probed work origin, and the stock box at Anchor1, whatever ORIGIN says.",
-      TIME: "No visible effect on the preview or the trace (load test 12).",
+      STOCK: "No stock box in the Machining Wizard; the preview and the laser trace are unaffected. The box is always drawn at Anchor1, the bottom-left L-bracket, not at the work origin.",
+      ORIGIN: "No visible effect: the toolpath is drawn at the probed work origin, and the stock box at Anchor1, whatever ORIGIN says.",
+      TIME: "No visible effect on the preview or the trace.",
     };
     for (const t of ["BEGIN", "SCHEMA", "MACHINE", "STOCK", "ORIGIN", "UNIT", "TIME", "END"]) {
       if (!tag(t)) {
         out.add({
           level: "note", code: `mkr-no-${t.toLowerCase()}`,
           title: `The header has no ${t} line`,
-          detail: MISSING[t] ?? `Makera Studio always writes ;@MKR|${t}. A minimal header without MATERIAL, CAM, MAXFEEDRATE, TIME or the TOOLPATH list previews and traces normally (load test 17); ${t} itself has not been left out on its own.`,
-          source: "EASYTRACE-Z1.md, load tests 2026-09-24",
+          detail: MISSING[t] ?? `Makera Studio always writes ;@MKR|${t}. A minimal header without MATERIAL, CAM, MAXFEEDRATE, TIME or the TOOLPATH list previews and traces normally; ${t} itself has not been left out on its own.`,
+          source: "Z1 load tests",
         });
       }
     }
@@ -448,8 +435,8 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       out.add({
         level: "note", code: "origin-type",
         title: `ORIGIN type_name=${origin.typeName}`,
-        detail: "topFrontLeft is the only type_name ever seen. ORIGIN has no visible effect on the preview or the trace (load tests 15 and 16), so another value is very likely harmless; it has not been tried.",
-        source: "MILLING.md; src/mkr.ts",
+        detail: "topFrontLeft is the only type_name ever seen. ORIGIN has no visible effect on the preview or the trace, so another value is very likely harmless; it has not been tried.",
+        source: "Observed on a Z1; src/mkr.ts",
       }, originTag!.line, rawLines[originTag!.line - 1]);
     }
     if (tools.length === 0) {
@@ -464,14 +451,14 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       out.add({
         level: "note", code: "no-toolpath-start",
         title: "No ;@MKR|TOOLPATH_START markers in the body",
-        detail: "Makera Studio puts one before each operation, pairing with the header's TOOLPATH list. A file without them previews and traces normally (load test 07), and Makera Studio shows no job list, so this is only a difference.",
-        source: "EASYTRACE-Z1.md, load tests 2026-09-24",
+        detail: "Makera Studio puts one before each operation, pairing with the header's TOOLPATH list. A file without them previews and traces normally, and Makera Studio shows no job list, so this is only a difference.",
+        source: "Z1 load tests",
       });
     } else if (toolpathsDeclared !== toolpathStarts) {
       out.add({
         level: "note", code: "toolpath-count",
         title: `Header lists ${toolpathsDeclared} toolpaths, body starts ${toolpathStarts}`,
-        detail: "In a Makera Studio file these always match one for one. Neither has a visible effect on the Z1 (load tests 07 and 13).",
+        detail: "In a Makera Studio file these always match one for one. Neither has a visible effect on the Z1.",
       });
     }
   }
@@ -482,8 +469,8 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
     out.add({
       level: "note", code: "no-thumbnail",
       title: "No thumbnail",
-      detail: "Cosmetic: the job list shows a blank tile beside the filename. The preview and the laser trace do not depend on it (load tests 19 and 23).",
-      source: "README.md, 'Preview and thumbnail'",
+      detail: "Cosmetic: the job list shows a blank tile beside the filename. The preview and the laser trace do not depend on it.",
+      source: "Observed on a Z1",
     });
   } else if (thumbEnd !== thumbBegin + 2 || !rawLines[thumbBegin + 1]?.startsWith(";")) {
     out.add({
@@ -500,8 +487,8 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       out.add({
         level: "warn", code: "thumbnail-not-png",
         title: "The thumbnail does not decode to a PNG",
-        detail: "fix_gcode.py once came close to base64'ing raw SVG markup into this line: a tile the controller cannot decode, with no error to say so.",
-        source: "kicad/fix_gcode.py, thumbnail()",
+        detail: "A tile made from raw SVG markup instead of a rendered image is one the controller cannot decode, with no error to say so.",
+        source: "Observed on a Z1",
       }, thumbBegin + 2);
     } else {
       thumbnail = { present: true, width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
@@ -609,8 +596,8 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       out.add({
         level: "note", code: "modal-motion",
         title: "Motion lines without a G word",
-        detail: "Bare coordinate lines inherit the last G0/G1/G2/G3. Fine on the Z1: a modal file previewed and boundary-traced like an explicit one (2026-09-24). They were once blamed for the blank preview, but those files also wrote M6 T<n>, which was the real cause. Makera Studio writes a G word on every line; nothing requires it.",
-        source: "EASYTRACE-Z1.md, 'Modal motion is fine'; cnc-facing README, 'Modal motion'",
+        detail: "Bare coordinate lines inherit the last G0/G1/G2/G3. Fine on the Z1: a modal file previewed and boundary-traced like an explicit one. They were once blamed for the blank preview, but those files also wrote M6 T<n>, which was the real cause. Makera Studio writes a G word on every line; nothing requires it.",
+        source: "Observed on a Z1",
       }, n, sample);
     }
 
@@ -640,7 +627,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           level: "warn", code: "g32",
           title: "Levelling probe (G32) in the file",
           detail: "Levelling is done from the controller before the job and persists across files and tool changes. Makera Studio never embeds it. What happens when a file probes mid-program is not known; it would at least re-level over whatever is on the bed.",
-          source: "PLAN.md non-negotiable 12; MILLING.md",
+          source: "Observed on a Z1",
         }, n, sample);
       } else if (g === 92 || g === 92.1 || g === 92.2 || g === 92.3) {
         out.add({
@@ -672,7 +659,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           detail: g === 80
             ? "G80 cancels a canned cycle. Harmless on its own, but it suggests the CAM expected to use one."
             : "Nobody here has run a literal canned cycle on the Z1. EasyTrace's 'G83 - Peck' setting expands to plain G1/G0 moves, which is what has actually run. Whether the controller accepts this word is not known.",
-          source: "MILLING.md",
+          source: "Observed on a Z1",
         }, n, sample);
       } else if (g >= 53 && g <= 59.3) {
         out.add({
@@ -702,22 +689,22 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
         level: "fail", code: "m6-split",
         title: "M6 without a T word on the same line",
         detail: "Split across two lines (FlatCAM does this), the controller aborts mid-job and drops its levelling heightmap. Write T1 M6 on one line (T first: M6 T1 blanks the preview).",
-        source: "PLAN.md non-negotiable 4; MILLING.md",
+        source: "Observed on a Z1",
       }, n, sample);
     } else if (t && !m6) {
       out.add({
         level: "fail", code: "m6-split",
         title: "T word without M6 on the same line",
         detail: "Split across two lines (FlatCAM does this), the controller aborts mid-job and drops its levelling heightmap. Write T1 M6 on one line (T first: M6 T1 blanks the preview).",
-        source: "PLAN.md non-negotiable 4; MILLING.md",
+        source: "Observed on a Z1",
       }, n, sample);
     }
     if (m6 && t) {
       tool = t.value;
       toolChanges.push(t.value);
       changedSinceSpindle = true;
-      // The one thing that blanks the preview and the laser trace. Load tests
-      // 05 and 31 (2026-09-24): the control file with only T1 M6 -> M6 T1
+      // The one thing that blanks the preview and the laser trace. Load tests:
+      // the control file with only T1 M6 -> M6 T1
       // changed loses its preview, and the trace only goes to the work origin.
       // T1 M6 is fine, and the spindle's M3 S / S M3 order does not matter
       // (32). The firmware runs either order, so nothing else says so.
@@ -726,7 +713,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           level: "silent", code: "m6-word-order",
           title: `Tool change written M6 T${t.value}`,
           detail: `The file cuts, but the controller shows no toolpath preview and the laser boundary trace only goes to the work origin, so the check that would show a clamp in the path does nothing. Write T${t.value} M6. EasyTrace5000 writes M6 T<n>; this is why its files never previewed.`,
-          source: "EASYTRACE-Z1.md, load tests 05 and 31 (2026-09-24)",
+          source: "Z1 load tests",
         }, n, sample);
       }
       if (spindle) {
@@ -734,7 +721,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           level: "warn", code: "m6-spindle-on",
           title: "Tool change with the spindle still running",
           detail: "Every file run here stops the spindle (M5) and lifts before M6. The controller may do it for you; nothing here has tested it.",
-          source: "kicad/fix_gcode.py, insert_tool_changes()",
+          source: "Observed on a Z1",
         }, n, sample);
       }
       if (tools.length && !declared.has(t.value)) {
@@ -773,7 +760,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
             level: "warn", code: "missing-tool-change",
             title: "New spindle speed with no tool change since the last start",
             detail: "This is the shape of EasyTrace's combined exports: one M6 at the top, then bare spindle starts, so every operation runs with the first bit. One of them drove a V-bit to -1.7mm forty-three times. If the bit really is the same, ignore this.",
-            source: "EASYTRACE-Z1.md; kicad/fix_gcode.py, insert_tool_changes()",
+            source: "Observed on a Z1",
           }, n, sample);
         }
         if (speed !== null) use().rpm.add(speed);
@@ -788,7 +775,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           level: "note", code: "m370",
           title: "Levelling grid cleared (M370)",
           detail: "An auto-levelling grid stays active across files and tool changes until M370. After this the Z levels are no longer compensated.",
-          source: "MILLING.md (G32 persistence, M370); " + "blackveilprecision/z1-macros CONTRIBUTING.md (Z1 firmware 1.1.2); not tested here",
+          source: "Observed on a Z1" + "blackveilprecision/z1-macros CONTRIBUTING.md (Z1 firmware 1.1.2); not tested here",
         }, n, sample);
       } else if (m === 498) {
         out.add({
@@ -805,7 +792,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           level: "warn", code: "m8",
           title: "Coolant (M8)",
           detail: "There is no coolant on this machine. At best it is ignored; it has not been tried.",
-          source: "MILLING.md",
+          source: "Observed on a Z1",
         }, n, sample);
       } else if (m === 0 || m === 1) {
         out.add({
@@ -818,7 +805,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           level: "warn", code: `m-${m}`,
           title: `M${m} is not a code this machine is known to accept`,
           detail: "Not in the codes tested here or in Makera's list as recorded. Some controllers abort a job on an unknown M code; on the Z1 that is untested.",
-          source: "MILLING.md",
+          source: "Observed on a Z1",
         }, n, sample);
       }
     }
@@ -831,14 +818,14 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           level: "warn", code: "rpm-low",
           title: `Spindle speed S${s.value}`,
           detail: `Below ${RPM_TYPO_BELOW} rpm. S1200 for S12000 has turned up four times in EasyTrace's forms, and at 1200 rpm and F500 a 2mm bit snaps. The lowest speed used on purpose here is 6000.`,
-          source: "MILLING.md; EASYTRACE-Z1.md",
+          source: "Observed on a Z1",
         }, n, sample);
       } else if (s.value > SPINDLE_MAX) {
         out.add({
           level: "warn", code: "rpm-high",
           title: `Spindle speed S${s.value}`,
           detail: `Above the Z1's published ${SPINDLE_MAX} rpm. What the controller does with it is not recorded; most likely it clamps.`,
-          source: "README.md, 'Fly cutters'",
+          source: "Observed on a Z1",
         }, n, sample);
       }
     }
@@ -851,7 +838,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           level: "fail", code: "feed-high",
           title: `Feed F${fmt(feed)} is above ${feedCeiling} mm/min`,
           detail: `${maxFeedTag ? "The header declares" : "Makera's header declares"} MAXFEEDRATE ${feedCeiling}, and this project refuses its own files above it. What the controller does above it is not recorded; no Makera sample goes past it.`,
-          source: "PLAN.md non-negotiable 9",
+          source: "Observed on a Z1",
         }, n, sample);
       }
     }
@@ -966,14 +953,14 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       level: "warn", code: "no-end",
       title: "No program end (M2)",
       detail: "Makera Studio ends with G28 then M02.",
-      source: "PLAN.md non-negotiable 8",
+      source: "Observed on a Z1",
     });
   } else if (endCode.code === "M30") {
     out.add({
       level: "warn", code: "m30",
       title: "Ends with M30, not M2",
-      detail: "Makera's code list: M30 is 'End of the program, no action on the Carvera'. It loads, previews and traces normally (load tests 02 and 30, 2026-09-24); whether it ends a running program cleanly has not been tested. Makera Studio ends with M02; fix_gcode.py rewrites it.",
-      source: "MILLING.md; kicad/fix_gcode.py",
+      detail: "Makera's code list: M30 is 'End of the program, no action on the Carvera'. It loads, previews and traces normally; whether it ends a running program cleanly has not been tested. Makera Studio ends with M02; a post-processor can rewrite it.",
+      source: "Observed on a Z1",
     }, endCode.line, rawLines[endCode.line - 1]);
   }
   if (spindle) {
@@ -990,7 +977,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       detail: airOnly
         ? "M7 and M9 are accepted and do nothing on this machine: there is no separate air port, and the air hose follows the vacuum. Both Makera Studio samples use only M7/M9. Put M331 before the tool change, M332 after M5, or switch the vacuum on from the controller."
         : "No M331 (auto vacuum, follows the spindle) or M801. Fine if you run extraction from the controller; otherwise the chips stay where they are cut.",
-      source: "MILLING.md; PLAN.md non-negotiable 6",
+      source: "Observed on a Z1",
     });
   }
   if (firstMotion >= 0 && toolChanges.length === 0) {
@@ -998,15 +985,15 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       level: "warn", code: "no-m6",
       title: "No tool change (M6) in the file",
       detail: "M6 is how this machine runs a bit change: it parks, lights the tool number on the LED strip and re-probes Z. Without one the file trusts that the right bit is in and Z was zeroed on it by hand.",
-      source: "MILLING.md; kicad/fix_gcode.py",
+      source: "Observed on a Z1",
     });
   }
   if (styleDiffs.size) {
     out.add({
       level: "note", code: "layout",
       title: "Layout differs from Makera Studio's",
-      detail: `${[...styleDiffs].join("; ")}. Both spellings run, and none of these affects the preview or the laser trace (load tests 02, 28 and 32, 2026-09-24). Only a difference from Makera Studio's layout.`,
-      source: "EASYTRACE-Z1.md, load tests 2026-09-24",
+      detail: `${[...styleDiffs].join("; ")}. Both spellings run, and none of these affects the preview or the laser trace. Only a difference from Makera Studio's layout.`,
+      source: "Z1 load tests",
     });
   }
 
@@ -1019,7 +1006,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
         level: "fail", code: "envelope",
         title: `The job spans ${fmt(w)} x ${fmt(h)} mm`,
         detail: `Beyond the Z1's ${ENVELOPE_X} x ${ENVELOPE_Y} mm travel from any origin. The controller stops with 'Soft Endstop ... was exceeded', possibly during the boundary trace, possibly mid-job.`,
-        source: "MILLING.md; src/validate.ts",
+        source: "Observed on a Z1; src/validate.ts",
       });
     }
   }
@@ -1028,7 +1015,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       level: "fail", code: "envelope-z",
       title: `Z spans ${fmt(zMax - zMin)} mm`,
       detail: `More than the Z1's ${ENVELOPE_Z} mm of Z travel.`,
-      source: "README.md, 'Fly cutters'",
+      source: "Observed on a Z1",
     });
   }
 
@@ -1039,7 +1026,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       level: "note", code: "y-positive",
       title: "The job runs into +Y (front-left origin)",
       detail: "Fine, and it is how Makera Studio lays jobs out. But the facing and PCB jobs here all run into -Y from a back-left origin, so zero this one on the stock's FRONT-left corner, not where you zero the others. A +Y job from a back-left origin is the one that hit 'Soft Endstop Y was exceeded'.",
-      source: "MILLING.md; PLAN.md non-negotiable 3",
+      source: "Observed on a Z1",
     });
   }
   if (stock && origin && extents) {
@@ -1047,27 +1034,27 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
     const backLeft = Math.abs(origin.y - W / 2) < 0.01;
     const frontLeft = Math.abs(origin.y + W / 2) < 0.01;
     // A NOTE: both origin conventions are valid and both have run here. And
-    // ORIGIN has no visible effect at all (load test 16, 2026-09-24): the stock
+    // ORIGIN has no visible effect at all (tested 2026-09-24): the stock
     // box is drawn at Anchor1 and the toolpath at the probed work origin.
     if ((backLeft && yDirection === "positive") || (frontLeft && yDirection === "negative")) {
       out.add({
         level: "note", code: "origin-mismatch",
         title: `ORIGIN is declared ${backLeft ? "back" : "front"}-left, but the job runs into ${yDirection === "positive" ? "+" : "-"}Y`,
-        detail: `Both origin conventions are valid. This header uses the ${backLeft ? "back" : "front"}-left form while the coordinates run the other way, as files from before the back-left convention do. The cut does not depend on it, and neither does the preview (load test 16). Zero where the coordinates say: the ${yDirection === "positive" ? "front" : "back"}-left corner.`,
-        source: "MILLING.md; kicad/fix_gcode.py, mkr_header()",
+        detail: `Both origin conventions are valid. This header uses the ${backLeft ? "back" : "front"}-left form while the coordinates run the other way, as older files do. The cut does not depend on it, and neither does the preview. Zero where the coordinates say: the ${yDirection === "positive" ? "front" : "back"}-left corner.`,
+        source: "Observed on a Z1",
       }, originTag!.line, rawLines[originTag!.line - 1]);
     } else if (!backLeft && !frontLeft) {
       out.add({
         level: "note", code: "origin-y",
         title: `ORIGIN y=${fmt(origin.y)} is neither edge of the ${fmt(W)}mm stock`,
-        detail: `Known-good headers put the origin on a stock edge: y=${fmt(-W / 2)} (front-left, +Y jobs) or y=${fmt(W / 2)} (back-left, -Y jobs). ORIGIN has no visible effect on the Z1 (load tests 15 and 16), so this is only a difference.`,
+        detail: `Known-good headers put the origin on a stock edge: y=${fmt(-W / 2)} (front-left, +Y jobs) or y=${fmt(W / 2)} (back-left, -Y jobs). ORIGIN has no visible effect on the Z1, so this is only a difference.`,
       }, originTag!.line, rawLines[originTag!.line - 1]);
     }
     if (Math.abs(origin.x + L / 2) > 0.01) {
       out.add({
         level: "note", code: "origin-x",
         title: `ORIGIN x=${fmt(origin.x)}, expected ${fmt(-L / 2)}`,
-        detail: "Every known-good header puts the origin on the stock's left edge, x = -length/2 from its centre. ORIGIN has no visible effect on the Z1 (load tests 15 and 16), so this is only a difference.",
+        detail: "Every known-good header puts the origin on the stock's left edge, x = -length/2 from its centre. ORIGIN has no visible effect on the Z1, so this is only a difference.",
       }, originTag!.line, rawLines[originTag!.line - 1]);
     }
     if (Number.isFinite(origin.z) && Math.abs(origin.z - H / 2) > 0.01) {
@@ -1103,13 +1090,13 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
               level: "note", code: "outside-stock",
               title: `Cuts up to ${fmt(worst)}mm past the declared stock: an overhang`,
               detail: `${over.join("; ")} (tool radius included). That is within one ${fmt(2 * radius)}mm bit's radius, as a facing job run past every edge or a profile cutout does. Make sure nothing but air is there.`,
-              source: "kicad/fix_gcode.py, fits_stock()",
+              source: "Observed on a Z1",
             }
           : {
               level: "warn", code: "outside-stock",
               title: "The cut reaches outside the declared stock",
               detail: `${over.join("; ")} (tool radius included), further than a bit's radius. The controller draws the preview inside the STOCK box, so a job outside it renders wrong, and a cut outside the stock you actually clamped is a cut into the vice or the bed.`,
-              source: "kicad/fix_gcode.py, fits_stock()",
+              source: "Observed on a Z1",
             }, stockTag!.line, rawLines[stockTag!.line - 1]);
       }
     }
@@ -1118,7 +1105,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
         level: "warn", code: "below-stock",
         title: `Cuts to Z${fmt(zMin)}, ${fmt(-zMin - H)}mm below the ${fmt(H)}mm stock`,
         detail: "Through-cuts go a little below the stock on purpose (0.2mm on FR4). This is more than that: make sure the backing under it is thick enough, or the bit goes into the spoilboard, the vice or the bed.",
-        source: "MILLING.md, dowel holes and backing",
+        source: "Observed on a Z1",
       });
     }
   }
@@ -1169,7 +1156,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
         level: "warn", code: "rapid-in-material",
         title: "Rapid moves through uncut material",
         detail: `G0 through stock the file has not cleared, up to ${fmt(e)}mm deep. At rapid speed that is a groove in the work at best and a broken bit at worst; an early facing job left exactly that groove. (Rapids below Z0 inside pockets already cleared are fine, and are not reported: Makera Studio does it thousands of times.)`,
-        source: "PLAN.md non-negotiable 2; src/stock.ts",
+        source: "Observed on a Z1; src/stock.ts",
       }, mv.line, rawLines[mv.line - 1]?.trim());
       return;
     }
@@ -1217,7 +1204,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
         level: "warn", code: "bit-unknown",
         title: `T${num} "${decl.name}" is not one of Makera's bits`,
         detail: `Not identified as an official bit: ${m.reason}${m.candidates.length ? ` (${m.candidates.map((b) => b.name).join(", ")})` : ""}. Every bit used here is an official one, so this usually means the header names the bit loosely or wrongly. Its feeds cannot be checked against Makera's table.`,
-        source: "TOOLING.md",
+        source: "Makera's speeds and feeds table",
       });
       bits.push({ tool: num, name: decl.name, unmatched: m.reason, used, over: {} });
       continue;
@@ -1235,7 +1222,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
         level: "warn", code: "deeper-than-flutes",
         title: `T${num} cuts to Z${fmt(u.zMin)}, deeper than the ${bit.name}'s ${flutes}mm flutes`,
         detail: "Either the header names the wrong bit for T" + num + " (then the controller's tool list, and this check, describe a bit that is not the one in the collet), or the shank rubs before the cut finishes. Check which bit this operation is really cut with.",
-        source: "src/validate.ts; TOOLING.md",
+        source: "Makera's speeds and feeds table; src/validate.ts",
       }, u.zMinLine, rawLines[(u.zMinLine ?? 1) - 1]?.trim());
     }
     if (!mat.id) {
@@ -1255,7 +1242,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
               ? " The long flat ends are the non-metal series, for wood, plastics and composites only. Do not reach for one because it is the longest thing in the box."
               : bit.kind === "corn" ? " Corn bits are published for PCB and carbon fibre only." : "")
           : `T${num} has no ${label} row in Makera's table, which usually means the bit is not meant for it.`,
-        source: "TOOLING.md",
+        source: "Makera's speeds and feeds table",
       });
       bits.push({ tool: num, name: decl.name, bit: bit.name, used, published: null, over });
       continue;
@@ -1274,14 +1261,14 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           level: "note", code: `${field}-deviation`,
           title: `T${num} ${what} ${fmt(v)}${unit}, over Makera's ${row[field]}${unit}, by a recorded choice`,
           detail: dev.why,
-          source: "TOOLING.md",
+          source: "Makera's speeds and feeds table",
         }
         : {
           level: "warn", code: `${field}-over-table`,
           title: `T${num} ${what} ${fmt(v)}${unit} is over Makera's ${row[field]}${unit}`,
           detail: `Makera's figure for the ${bit.name} in ${label} is ${row.rpm} rpm / F${row.feed} / plunge ${row.plunge} / ${row.doc}mm per pass, and it is a ceiling: "start the test from the lower limit of the parameter".` +
             (field === "doc" ? " Depth is measured on a simulated stock: how deep a band of new material at least a fifth of the bit wide goes. A helix counts its pitch, moves through cleared air count nothing, and a finishing pass skimming a thin wall is not a deep pass." : ""),
-          source: "TOOLING.md, from wiki.makera.com/en/speeds-and-feeds",
+          source: "Makera's speeds and feeds table (wiki.makera.com/en/speeds-and-feeds)",
         }, line, line ? rawLines[line - 1]?.trim() : undefined);
     };
     if (!isDrill) ceiling("feed", u.feed, u.feedLine);
@@ -1298,7 +1285,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
         level: "warn", code: `${field}-under-table`,
         title: `T${num} ${what} ${fmt(v)} mm/min, under Makera's ${row[field]} mm/min`,
         detail: `This project always uses Makera's figures. For the ${bit.name} in ${label} that is ${row.rpm} rpm / F${row.feed} / plunge ${row.plunge}. A lower number is usually a slip in the CAM form, so check the field rather than assume it was meant.`,
-        source: "TOOLING.md, from wiki.makera.com/en/speeds-and-feeds",
+        source: "Makera's speeds and feeds table (wiki.makera.com/en/speeds-and-feeds)",
       }, line, line ? rawLines[line - 1]?.trim() : undefined);
     };
     if (!isDrill) under("feed", u.feed, u.feedLine);
@@ -1316,7 +1303,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           level: "warn", code: "chipload-over-table",
           title: `T${num} at S${s}: ${(load / pub).toFixed(1)}× Makera's chip load`,
           detail: `Makera runs the ${bit.name} in ${label} at ${row.rpm} rpm and F${row.feed}, ${(pub * 1000).toFixed(1)} µm per revolution. This file's F${fmt(u.feed ?? row.feed)} at ${s} rpm is ${(load * 1000).toFixed(1)} µm, a heavier bite than the table allows.`,
-          source: "TOOLING.md",
+          source: "Makera's speeds and feeds table",
         });
       } else {
         over.rpm = "under";
@@ -1324,7 +1311,7 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           level: "warn", code: "rpm-differs",
           title: `T${num} at S${s}, where Makera gives ${row.rpm}`,
           detail: `The chip load stays within Makera's (F${fmt(u.feed ?? 0)} at ${s} rpm), so this is a lighter cut, not a riskier one. But this project always uses Makera's figures, and a speed that differs is how S1200-for-12000 slipped through before: check the field.`,
-          source: "TOOLING.md",
+          source: "Makera's speeds and feeds table",
         });
       }
     }

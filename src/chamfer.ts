@@ -21,7 +21,7 @@
  *
  * The faced top is at Z = -depth, so the tip's final Z is -(depth + t). Z0 is
  * still the stock's original top after the tool change, because M6 re-probes
- * the new bit's length (MILLING.md, the M6 notes), which is what the PCB jobs'
+ * the new bit's length (tested), which is what the PCB jobs'
  * drills rely on too.
  *
  * DIRECTION
@@ -89,7 +89,7 @@ const f3 = (v: number) => (Object.is(v, -0) ? 0 : v).toFixed(3);
  * Starts right after the facing body has lifted to SAFE_Z, and ends down in
  * the cut; gcode.ts's trailer lifts, stops and parks as it always has.
  *
- * `G0 Z5`, `M5`, then `T2 M6` on ONE line: the order fix_gcode.py inserts at a
+ * `G0 Z5`, `M5`, then `T2 M6` on ONE line: the order used at a
  * bit change and every multi-tool PCB file here has run with.
  */
 export function chamferBody(plan: ChamferPlan): string[] {

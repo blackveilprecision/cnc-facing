@@ -1,9 +1,8 @@
 /**
  * The toolpath. Pure: numbers in, geometry and G-code strings out.
  *
- * The serpentine-x pattern is a port of `surface_spoilboard.py`'s `facing()` from
- * ~/src/ha/esp/garasje/kicad, generalised to multiple depth passes. That script
- * has been run on the machine and its output is the golden fixture in
+ * The serpentine-x pattern follows a reference facing script, generalised to
+ * multiple depth passes. That script has been run on the machine and its output is the golden fixture in
  * test/fixtures; for a single-pass MDF job this module emits the same motion
  * lines byte for byte, and the test asserts it.
  *
@@ -28,7 +27,7 @@
  * tool centre never goes behind or left of X0 Y0 -- rule 2's direction, which
  * is where the soft endstop is. At the cap the centre runs exactly along the
  * block's edges, which is also where the laser boundary trace then sits: the
- * controller traces the tool centre, not the edge of the cut (MILLING.md's
+ * controller traces the tool centre, not the edge of the cut (a
  * 2026-09-19 trace went to X1.587 Y158.412 for a 120 x 160 job).
  *
  * PATTERNS
@@ -185,7 +184,7 @@ export interface FacingPath {
   readonly seconds: number;
 }
 
-/** Safe Z for rapids above the work. Matches surface_spoilboard.py and the CAM. */
+/** Safe Z for rapids above the work. Matches the reference script and Makera Studio. */
 export const SAFE_Z = 5.0;
 
 /**
@@ -198,7 +197,7 @@ export const SAFE_Z = 5.0;
  */
 export const CLEAR_Z = 1.0;
 
-/** Rapids are charged at this rate in the time estimate, as fix_gcode.py does. */
+/** Rapids are charged at this rate in the time estimate. */
 const RAPID_FEED = 1000;
 
 /**
@@ -442,7 +441,7 @@ function program(levels: Level[]): Op[] {
  * Makera's own files always carry the field, so ours does too. It is advisory --
  * the controller does not gate on it -- but it is also the number the UI shows
  * the user to talk them out of a 4-hour brass job, so it times every move the
- * body makes rather than using surface_spoilboard.py's cutting-length-only
+ * body makes rather than the reference script's cutting-length-only
  * approximation, plus the final retract gcode.ts adds after it.
  */
 function estimateSeconds(levels: Level[], spec: FacingSpec): number {
@@ -482,7 +481,7 @@ function f3(v: number): string {
  * The motion body: everything between the spindle-start dwell and the retract.
  *
  * For a single-level `general` serpentine-x job this is byte-identical to
- * surface_spoilboard.py's output, which is what the golden test pins down. A
+ * the reference script's output, which is what the golden test pins down. A
  * cutting move names only the axes that change, which is what the reference
  * does and what makes a spiral's ring stepover the only two-axis G1.
  */

@@ -75,8 +75,8 @@ describe("this app's own output", () => {
 });
 
 describe("real files", () => {
-  test("the golden fixture (surface_spoilboard.py, run on the machine) is ok", async () => {
-    const r = checkGcode(await fixture("surface_spoilboard-80x60x0.3.nc"), "surface_spoilboard-80x60x0.3.nc");
+  test("the golden fixture (reference facing script, run on the machine) is ok", async () => {
+    const r = checkGcode(await fixture("reference-facing-80x60x0.3.nc"), "reference-facing-80x60x0.3.nc");
     expect(serious(r)).toEqual([]);
   });
 
@@ -86,29 +86,27 @@ describe("real files", () => {
     expect(r.stats.toolChanges).toEqual([1, 2]);
   });
 
-  test("its raw export shows every fault fix_gcode.py exists to fix", async () => {
+  test("its raw export shows every fault a post-processor exists to fix", async () => {
     const r = checkGcode(await fixture("easytrace-B-back-RAW.cnc"), "easytrace-B-back-RAW.cnc");
     expect(r.verdict).toBe("silent");
     expect(codes(r)).toEqual(expect.arrayContaining([
       "m6-word-order", "mkr-missing", "m30", "extension", "modal-motion", "missing-tool-change",
     ]));
-    // M6 T1 is the one that blanks the preview (load tests 05/31, 2026-09-24).
+    // M6 T1 is the one that blanks the preview (tested 2026-09-24).
     expect(codes(r, "silent")).toContain("m6-word-order");
     // 475 bare lines, the number the examples README gives for this file.
     expect(r.findings.find((f) => f.code === "modal-motion")!.count).toBe(475);
   });
 });
 
-describe("the CRLF and modal-motion stories are not asserted as failures", () => {
-  // Both were blamed for the blank preview, and both are among the six
-  // hypotheses EASYTRACE-Z1.md records as tested on the machine and FAILED --
-  // the cause was the tool change written M6 T<n> (load tests, 2026-09-24).
-  // Both were then tested on their own and are fine. A checker that calls
-  // either a failure is repeating a disproved story.
-  test("LF line endings alone are a note, and leave the verdict ok", () => {
+describe("line endings and modal motion are not asserted as failures", () => {
+  // Both were blamed for the blank preview, and both were tested on the machine
+  // and are fine -- the cause was the tool change written M6 T<n> (2026-09-24).
+  // A checker that calls either a failure is repeating a disproved story.
+  test("LF line endings are not mentioned at all: both endings work", () => {
     const r = checkGcode(generated().join("\n") + "\n", "job.nc");
     expect(r.stats.lineEndings).toBe("lf");
-    expect(r.findings.find((f) => f.code === "line-endings")!.level).toBe("note");
+    expect(codes(r)).not.toContain("line-endings");
     expect(r.verdict).toBe("ok");
   });
 
@@ -369,7 +367,7 @@ describe("the bits, against Makera's table", () => {
       expect(bit(checkGcode(pcb(0.1), "pcb.nc")).over).toEqual({});
     });
 
-    test("at 0.12 it is over, by the choice TOOLING.md records: a note", () => {
+    test("at 0.12 it is over, by deliberate choice: a note", () => {
       const r = checkGcode(pcb(0.12), "pcb.nc");
       expect(bit(r).over.doc).toBe("deviation");
       expect(r.findings.find((f) => f.code === "doc-deviation")!.level).toBe("note");

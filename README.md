@@ -43,8 +43,7 @@ bun run typecheck
 ![The check tab with a toolpath and findings](docs/check.png)
 
 The machine knowledge lives in `src/facing.ts`, `src/mkr.ts`, `src/materials.ts`
-and `src/check.ts`, with each rule commenting where it was learned. `PLAN.md`
-has the original design.
+and `src/check.ts`, with each rule commenting where it was learned.
 
 ## Docker
 

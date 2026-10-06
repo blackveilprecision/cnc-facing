@@ -126,7 +126,7 @@ export function summarise(path: FacingPath, stock: StockDeclaration, chamfer: Ch
   }
 
   // The laser boundary trace follows the tool CENTRE, not the edge of the cut
-  // (MILLING.md's first trace: X1.587 Y158.412 for 120 x 160; confirmed on a
+  // (a first trace: X1.587 Y158.412 for 120 x 160; confirmed on a
   // 45.2mm block 2026-09-23). Saying where to expect it is what stops the size
   // being inflated to make the laser reach the edge.
   warnings.push({
@@ -150,7 +150,7 @@ export function summarise(path: FacingPath, stock: StockDeclaration, chamfer: Ch
     });
   }
 
-  // MILLING.md: the 160mm facing job found its soft endstop mid-trace.
+  // A 160mm facing job found its soft endstop mid-trace.
   warnings.push({
     level: "note",
     text: `Needs +${spec.width}mm X, −${spec.height}mm Y from X0 Y0. Run the reach check below.`,

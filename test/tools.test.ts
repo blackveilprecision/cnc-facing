@@ -46,7 +46,7 @@ describe("the table itself", () => {
     for (const id of MATERIAL_IDS) {
       for (const t of MATERIALS[id].tools) {
         expect(t.derived).toBe(false);
-        expect(t.source).toContain("TOOLING.md");
+        expect(t.source).toContain("speeds and feeds");
       }
     }
   });
@@ -106,7 +106,7 @@ describe("choosing a bit", () => {
 });
 
 describe("the filename", () => {
-  test("keeps the pattern PLAN.md documents, with one bit in play", () => {
+  test("keeps the one-bit pattern, with one bit in play", () => {
     // The plain name is serpentine-x, as it was for every job before 0.9.0;
     // the default since then is named like any other pattern.
     const x = { ...REQ, pattern: "serpentine-x" } as const;

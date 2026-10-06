@@ -1,5 +1,5 @@
 /**
- * The golden test: our motion must match `surface_spoilboard.py`'s, exactly.
+ * The golden test: our motion must match the reference facing script's, exactly.
  *
  * The fixture is that script's real output for 80 x 60 x 0.3 in MDF, the job
  * this machine has run successfully. Diffing against it pins down the path, the
@@ -19,7 +19,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { buildJob, modalise } from "../src/gcode.ts";
 
-const FIXTURE = "test/fixtures/surface_spoilboard-80x60x0.3.nc";
+const FIXTURE = "test/fixtures/reference-facing-80x60x0.3.nc";
 
 /** Motion and modal lines: everything that is not a comment or a blank. */
 function motion(text: string): string[] {
@@ -29,7 +29,7 @@ function motion(text: string): string[] {
     .filter((l) => l && !l.startsWith(";") && !l.startsWith("("));
 }
 
-describe("golden: surface_spoilboard.py 80 x 60 x 0.3 MDF", () => {
+describe("golden: reference script 80 x 60 x 0.3 MDF", () => {
   const reference = motion(readFileSync(FIXTURE, "latin1"));
   const built = buildJob(
     // The script only knows X; the app's default moved to serpentine-y in 0.9.0.

@@ -2,7 +2,7 @@
  * Assembles the file: `;@MKR|` header, comments, preamble, body, trailer,
  * thumbnail. CRLF throughout.
  *
- * The preamble and trailer are a straight port of `surface_spoilboard.py`, which
+ * The preamble and trailer are a straight port of the reference facing script, which
  * is the file this machine has actually run. Every line in them is load-bearing:
  *
  *   M331 BEFORE the tool change   the proven order, used by every file the
@@ -15,7 +15,7 @@
  *                                 mid-job and loses its levelling heightmap.
  *                                 Written M6 T1, the controller shows no
  *                                 preview and the laser trace only goes to the
- *                                 work origin (load tests 05/31, 2026-09-24).
+ *                                 work origin (tested 2026-09-24).
  *                                 The firmware runs either order.
  *                                 M6 is not something to avoid: it parks the
  *                                 head, shows the bit number on the LED strip
@@ -53,7 +53,7 @@ export const VERSION: string = pkg.version;
  *
  * It only sets how tall the controller draws its preview box (and so the
  * ORIGIN z, which is half of it); nothing about the cut depends on it. 12 is
- * what surface_spoilboard.py declares in the file this machine has run, so
+ * what the reference script declares in the file this machine has run, so
  * the header stays the proven one. The depth that could matter -- more than
  * the bit can reach -- is capped by the 12mm flute length in validate.ts.
  */
@@ -188,7 +188,7 @@ export function buildJob(req: JobRequest, opts: BuildOptions = {}): BuildResult 
  * Every file before 0.10.0 had a G word on every motion line, as Makera Studio
  * writes them, because bare lines were once blamed for the blank preview and the
  * zero-size boundary trace. Those files also wrote their tool changes M6 T<n>,
- * which was the real cause (EASYTRACE-Z1.md, load tests). On 2026-09-24 a file
+ * which was the real cause (load tests). On 2026-09-24 a file
  * from this function -- 69 bare lines, nothing else changed -- previewed and
  * boundary-traced exactly like the explicit one, so every file is written this
  * way now.
@@ -221,8 +221,8 @@ export function modalise(lines: string[]): string[] {
  * Both Makera sample files are CRLF throughout, and so is every file that has
  * previewed on this machine, so this matches them. It is NOT the fix for the
  * blank preview, though it was once believed to be (a \r\n splitter would read
- * an LF file as one line): an LF file previews and traces normally (load test
- * 08, 2026-09-24). The cause was the tool change written M6 T<n>. Kept because
+ * an LF file as one line): an LF file previews and traces normally (tested
+ * 2026-09-24). The cause was the tool change written M6 T<n>. Kept because
  * matching the known-good file costs nothing; the checker (check.ts) reports LF
  * as a note, not a failure.
  */
@@ -231,7 +231,7 @@ export function writeGcode(lines: string[]): string {
 }
 
 /**
- * `facing-<material>-<X>x<Y>-<depth>mm-<YYYYMMDD>.nc`, the garasje naming habit.
+ * `facing-<material>-<X>x<Y>-<depth>mm-<YYYYMMDD>.nc`.
  *
  * Anything that changes the cut but not those fields gets named too, because two
  * jobs sharing a filename is how the wrong one ends up on the machine:

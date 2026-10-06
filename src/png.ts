@@ -1,14 +1,14 @@
 /**
  * A minimal indexed-colour PNG encoder, and the tiny raster canvas that feeds it.
  *
- * Why hand-rolled: `fix_gcode.py`'s `thumbnail()` shells out to ImageMagick, and
+ * Why hand-rolled: a thumbnail script that shells out to ImageMagick, and
  * an absent `magick` binary there is a hard failure. This app has to produce a
  * thumbnail on every request, in a browser-facing server, so the encoder is
  * inline and has no dependencies beyond node:zlib. It only has to draw what a
  * facing preview contains: filled rectangles and straight lines.
  *
  * Palette PNG (colour type 3) rather than truecolour, for the same reason
- * fix_gcode.py passes `PNG8:` and `-colors 32`: these previews are line art on a
+ * ImageMagick's `PNG8:` with `-colors 32` is used for such files: these previews are line art on a
  * flat ground, so a truecolour encode costs roughly 15x the bytes for no visible
  * gain -- and those bytes go into the .nc file as base64, on a machine that
  * reads it off a USB stick.

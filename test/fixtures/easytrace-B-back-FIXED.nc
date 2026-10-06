@@ -22,7 +22,7 @@
 (  - isolation: flip-gauge-pcb-v3-User_2.gbr)
 (  - drill: flip-gauge-pcb-v3-drill-1.0mm.drl)
 (---)
-(Adapted for Makera Z1 by kicad/fix_gcode.py)
+(Adapted for Makera Z1)
 
 G90 G21
 

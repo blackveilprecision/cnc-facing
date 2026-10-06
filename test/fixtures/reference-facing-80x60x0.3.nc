@@ -4,7 +4,7 @@
 ;@MKR|MATERIAL|id=|name3=other|name1=Other|name2=MDF spoilboard
 ;@MKR|STOCK|id=cuboid|length=80|width=60|height=12|diameter=50
 ;@MKR|ORIGIN|id=0|type_name=topFrontLeft|x=-40|y=30|z=6
-;@MKR|CAM|id=surface_spoilboard|name=surface_spoilboard|v=1.0
+;@MKR|CAM|id=reference_facing|name=reference_facing|v=1.0
 ;@MKR|UNIT|value=mm
 ;@MKR|MAXFEEDRATE|value=1200
 ;@MKR|TOOL|number=1|id=|name=3.175*12mm Flat End - SPOILBOARD|type=Flat End|sticklength=0|handlediameter=3.175|flutelength=12|diameter=3.175|tipdiameter=3.175|cornerradius=0|angle=0|halfAngle=0
