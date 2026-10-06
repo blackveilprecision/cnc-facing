@@ -4,10 +4,14 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { LIBRARY, libraryBit } from "../src/makera.ts";
+import { LIBRARY, LIBRARY_SOURCE, libraryBit } from "../src/makera.ts";
 import { resolve } from "../src/materials.ts";
 
 describe("the library", () => {
+  test("records the CarveraProfiles commit it came from", () => {
+    expect(LIBRARY_SOURCE).toMatch(/^https:\/\/github\.com\/MakeraInc\/CarveraProfiles\/tree\/[0-9a-f]{40}\//);
+  });
+
   test("ids are unique and every bit says which collet it needs", () => {
     expect(new Set(LIBRARY.map((b) => b.id)).size).toBe(LIBRARY.length);
     for (const b of LIBRARY) {

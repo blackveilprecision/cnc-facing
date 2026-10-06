@@ -48,11 +48,13 @@ The machine knowledge lives in `src/facing.ts`, `src/mkr.ts`, `src/materials.ts`
 and `src/check.ts`, with each rule commenting where it was learned.
 
 The full Makera bit list, with Makera's presets per material, is
-`src/makera-bits.json`, read through `src/makera.ts`. It is generated from
-Makera's Fusion 360 tool library:
+`src/makera-bits.json`, read through `src/makera.ts`. It is generated from the
+Fusion 360 tool libraries in Makera's
+[CarveraProfiles](https://github.com/MakeraInc/CarveraProfiles) repository, and
+records the commit it came from:
 
 ```sh
-bun scripts/makera-library.ts [path to the library folder]
+bun scripts/makera-library.ts [git ref, default main]
 ```
 
 ## Docker
