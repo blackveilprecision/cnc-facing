@@ -1,6 +1,6 @@
 {
   "name": "cnc-facing",
-  "version": "0.10.9",
+  "version": "0.10.10",
   "description": "Facing-job generator for the Makera Z1",
   "license": "MPL-2.0",
   "repository": {

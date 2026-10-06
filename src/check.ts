@@ -578,7 +578,14 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
     const p = parseLine(raw);
     if (!p.code) continue;
     const sample = raw.trim().slice(0, 120);
-    if (p.junk) {
+    if (/[#[\]]/.test(p.code)) {
+      out.add({
+        level: "warn", code: "variables",
+        title: "Variables or expressions (#, [ ])",
+        detail: "The Z1 firmware has no variables, expressions or O-word loops, and does not reject them: a word like Z[#<depth>] is reported to be read as Z0, so the move quietly goes somewhere else. Do the arithmetic in the generator and write plain numbers.",
+        source: "blackveilprecision/z1-macros CONTRIBUTING.md (Z1 firmware 1.1.2); not tested here",
+      }, n, sample);
+    } else if (p.junk) {
       out.add({
         level: "warn", code: "unparsed",
         title: "Characters that are not G-code words",
@@ -634,6 +641,29 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
           title: "Levelling probe (G32) in the file",
           detail: "Levelling is done from the controller before the job and persists across files and tool changes. Makera Studio never embeds it. What happens when a file probes mid-program is not known; it would at least re-level over whatever is on the bed.",
           source: "PLAN.md non-negotiable 12; MILLING.md",
+        }, n, sample);
+      } else if (g === 92 || g === 92.1 || g === 92.2 || g === 92.3) {
+        out.add({
+          level: g === 92 ? "note" : "warn", code: g === 92 ? "g92" : "g92-clear",
+          title: g === 92 ? "Coordinate offset (G92)" : `G${g} clears the G92 offset`,
+          detail: g === 92
+            ? "Makera Studio keeps its X/Y/Z/A origins in G92, and G92 offsets live in RAM, not the saved G54. A file that sets its own G92 changes where the job lands relative to what the controller was zeroed to."
+            : "Studio's 'set current position as origin' and its 4th-axis toolpaths keep their origins in G92, so clearing it wipes them. Leave G92 alone unless the file is meant to own the origin.",
+          source: "blackveilprecision/z1-macros CONTRIBUTING.md (Z1 firmware 1.1.2); not tested here",
+        }, n, sample);
+      } else if (g === 10) {
+        out.add({
+          level: "warn", code: "g10",
+          title: "Work offset written from the file (G10)",
+          detail: "Only G54 is saved to the machine's EEPROM, and every G10 that sets it is one write. A file that sets its own work offset also overrides the zero the controller was set to. Set the origin from the controller instead.",
+          source: "blackveilprecision/z1-macros CONTRIBUTING.md (Z1 firmware 1.1.2); not tested here",
+        }, n, sample);
+      } else if (g >= 38 && g < 39) {
+        out.add({
+          level: "note", code: "probe",
+          title: `Probe move (G${g})`,
+          detail: "Probe distances are relative to the current position. G38.2 raises an alarm if nothing is touched; G38.3 does not. While a file plays, the firmware discards each line's output, probe results included, so a result cannot be read back from the file (M498 prints the stored G54 offset to Studio's log).",
+          source: "blackveilprecision/z1-macros CONTRIBUTING.md (Z1 firmware 1.1.2); not tested here",
         }, n, sample);
       } else if (g >= 80 && g <= 89) {
         out.add({
@@ -753,7 +783,21 @@ export function checkGcode(text: string, filename = "upload.nc", opts: CheckOpti
       } else if (m === 5) spindle = false;
       else if (m === 2) endCode = { code: "M2", line: n };
       else if (m === 30) endCode ??= { code: "M30", line: n };
-      else if (m === 331) vacuum = "auto";
+      else if (m === 370) {
+        out.add({
+          level: "note", code: "m370",
+          title: "Levelling grid cleared (M370)",
+          detail: "An auto-levelling grid stays active across files and tool changes until M370. After this the Z levels are no longer compensated.",
+          source: "MILLING.md (G32 persistence, M370); " + "blackveilprecision/z1-macros CONTRIBUTING.md (Z1 firmware 1.1.2); not tested here",
+        }, n, sample);
+      } else if (m === 498) {
+        out.add({
+          level: "note", code: "m498",
+          title: "Stored G54 offset printed (M498)",
+          detail: "Prints the saved G54 offset to Studio's log and works from a file; it does not move anything.",
+          source: "blackveilprecision/z1-macros CONTRIBUTING.md (Z1 firmware 1.1.2); not tested here",
+        }, n, sample);
+      } else if (m === 331) vacuum = "auto";
       else if (m === 801) vacuum ??= "direct";
       else if (m === 7 || m === 9) airOnly = true;
       else if (m === 8) {

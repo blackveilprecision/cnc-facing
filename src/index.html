@@ -28,6 +28,8 @@
   }
   header h1 { font-size: 1.05rem; margin: 0; letter-spacing: .01em; }
   header .sub { color: var(--dim); font-size: .85rem; }
+  footer { text-align: center; color: var(--dim); font-size: .82rem; padding: 1rem 1.25rem 2rem; }
+  footer a { color: var(--accent); }
   main {
     display: grid; grid-template-columns: minmax(300px, 380px) 1fr;
     gap: 1.25rem; padding: 1.25rem; max-width: 1200px; margin: 0 auto;
@@ -327,6 +329,11 @@
     </div>
   </div>
 </main>
+
+<footer>
+  <a href="https://github.com/nilsan/cnc-facing">Source on GitHub</a> · MPL-2.0 ·
+  <a href="https://github.com/nilsan/cnc-facing/issues">Report a problem</a>
+</footer>
 
 <script type="module">
 const $ = (id) => document.getElementById(id);

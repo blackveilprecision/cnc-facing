@@ -35,6 +35,11 @@ bun run typecheck
   which were mainly PCB milling. "No findings" is not a promise that a job is
   safe, and a Warning means "differs from what is known to work", not "wrong".
 
+  A few of its rules (variables and expressions, `G92`, `G10`, `G38.x`, `M498`)
+  come from firmware notes in
+  [blackveilprecision/z1-macros](https://github.com/blackveilprecision/z1-macros)
+  and have not been tested on this machine; each finding says so.
+
 ![The check tab with a toolpath and findings](docs/check.png)
 
 The machine knowledge lives in `src/facing.ts`, `src/mkr.ts`, `src/materials.ts`

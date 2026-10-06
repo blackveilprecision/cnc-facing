@@ -382,3 +382,42 @@ describe("the bits, against Makera's table", () => {
     });
   });
 });
+
+describe("firmware quirks reported by blackveilprecision/z1-macros (not tested on this machine)", () => {
+  const withLine = (line: string) => mutate((l) => { const i = l.findIndex((x) => x.startsWith("G1 ")); l.splice(i, 0, line); return l; });
+
+  test("variables and expressions are one finding, not a pile of unparsed characters", () => {
+    const r = withLine("G1 Z[#<depth>] F300");
+    expect(codes(r)).toContain("variables");
+    expect(codes(r)).not.toContain("unparsed");
+    expect(r.findings.find((f) => f.code === "variables")?.level).toBe("warn");
+  });
+
+  test("G92 is a note, and G92.1 a warning", () => {
+    expect(withLine("G92 X0 Y0").findings.find((f) => f.code === "g92")?.level).toBe("note");
+    expect(withLine("G92.1").findings.find((f) => f.code === "g92-clear")?.level).toBe("warn");
+  });
+
+  test("G10 warns about overriding the controller's zero", () => {
+    expect(withLine("G10 L20 P1 X0 Y0 Z0").findings.find((f) => f.code === "g10")?.level).toBe("warn");
+  });
+
+  test("G38.x is a note, and no longer an 'untested G code'", () => {
+    const r = withLine("G38.2 Z-5 F50");
+    expect(codes(r, "note")).toContain("probe");
+    expect(codes(r).some((c) => c.startsWith("g-38"))).toBe(false);
+  });
+
+  test("M370 and M498 are notes, not unknown M codes", () => {
+    for (const [line, code] of [["M370", "m370"], ["M498", "m498"]] as const) {
+      const r = withLine(line);
+      expect(codes(r, "note")).toContain(code);
+      expect(codes(r)).not.toContain(`m-${line.slice(1)}`);
+    }
+  });
+
+  test("a generated job triggers none of them", () => {
+    const r = checkGcode(writeGcode(generated()), "job.nc");
+    for (const c of ["variables", "g92", "g92-clear", "g10", "probe", "m370", "m498"]) expect(codes(r)).not.toContain(c);
+  });
+});
